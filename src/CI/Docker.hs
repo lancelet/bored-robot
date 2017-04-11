@@ -50,20 +50,25 @@ data DockerEx
 -- | Docker effects.
 data Docker x where
     RemoveImage :: Image -> [Image] -> Docker ()
-    BuildImage  :: Path -> Maybe Tag -> Docker Image
+    BuildImage  :: Path -> Docker Image
     TagImage    :: Image -> Tag -> Docker ()
     PushImage   :: Image -> Docker ()
     PullImage   :: Image -> Docker ()
 
 -- * Language
 
--- | Delete one or more Docker images.
+-- | Delete a Docker image.
 --
--- If one or more of the 'Image's do not exist, the 'NoSuchImage'
--- effect will be raised.
+-- If the 'Image' does not exist the 'NoSuchImage' exception will be
+-- raised.
 removeImage :: Member Docker r => Image -> Eff r ()
 removeImage img = send (RemoveImage img [])
 
+-- | Delete multiple Docker images.
+--
+-- If the list is empty a 'DockerError' exception will be raised. If
+-- one or more of the 'Image's does not exist the 'NoSuchImage'
+-- exception will be raised.
 removeImages
     :: (Member Docker r, Member (Exception DockerEx) r)
     => [Image]
@@ -71,11 +76,18 @@ removeImages
 removeImages [] = throwException (DockerError "Must specify images to remove")
 removeImages (i:is) = send (RemoveImage i is)
 
--- | Build a Docker image based on instructions in a 'Path'
+-- | Build a Docker image based on instructions in a 'Path'.
 --
--- When completed, the image will be tagged with the 'Tag'.
-buildImage :: Member Docker r => Path -> Maybe Tag -> Eff r Image
-buildImage path tag = send (BuildImage path tag)
+-- When completed the image will be tagged with the 'Tag'.
+buildImage
+    :: Member Docker r
+    => Path
+    -> Maybe Tag
+    -> Eff r Image
+buildImage path tag = do
+    img <- send (BuildImage path)
+    maybe (pure ()) (tagImage img) tag
+    return img
 
 -- | Apply a 'Tag' to a Docker 'Image'.
 tagImage :: Member Docker r => Image -> Tag -> Eff r ()
@@ -101,7 +113,7 @@ runDocker = handleRelay return handle
   where
     handle :: Handler Docker r a
     handle (RemoveImage img imgs) k = procRemoveImage (img:imgs) >>= k
-    handle (BuildImage path tag)  k = procBuildImage path tag >>= k
+    handle (BuildImage path)      k = procBuildImage path >>= k
     handle (TagImage img tag)     k = procTagImage img tag >>= k
     handle (PushImage img)        k = procPushImage img >>= k
     handle (PullImage img)        k = procPullImage img >>= k
@@ -126,16 +138,20 @@ procPullImage img = do
     (status, stdout, stderr) <- docker "pull" [imageRepr img]
     return ()
 
+-- | Build a Docker 'Image' using the @Dockerfile@ in a directory.
 procBuildImage
     :: ( Member Proc r
       , Member (Exception DockerEx) r)
-    => Path
-    -> Maybe Tag
+    => Path -- ^ Directory containing the @Dockerfile@
     -> Eff r Image
-procBuildImage path Nothing = do
+procBuildImage path = do
     (status, stdout, stderr) <- docker "build" [path]
     return (Image "yay!")
 
+-- | Tag a Docker 'Image' with a 'Tag'.
+--
+-- If the 'Image' does not exist a 'NoSuchImage' exception will be
+-- raised.
 procTagImage
     :: (Member Proc r,
        Member (Exception DockerEx) r)
@@ -144,6 +160,9 @@ procTagImage
     -> Eff r ()
 procTagImage img tag = do
     (status, stdout, stderr) <- docker "tag" [imageRepr img, imageRepr img <> ":" <> tagRepr tag]
+    when (isFailure status) $
+        -- TODO Parse the error and throw correct exception
+        throwException (NoSuchImage img)
     return ()
 
 procRemoveImage
@@ -153,7 +172,8 @@ procRemoveImage
     -> Eff r ()
 procRemoveImage imgs = do
     (status, stdout, stderr) <- docker "rmi" (imageRepr <$> imgs)
-    when (isFailure status) (throwException (DockerError . T.decodeUtf8 . unStderr $ stderr)) -- NoSuchImage (Image "wot")))
+    -- TODO: Parse actual response.
+    when (isFailure status) (throwException (DockerError . T.decodeUtf8 . unStderr $ stderr))
     return ()
 
 -- | Invoke the docker command line application.
