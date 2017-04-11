@@ -37,13 +37,25 @@ executable bored-robot
                      , bored-robot
   default-language:    Haskell2010
 
+executable docker-fu
+  hs-source-dirs:      app
+  main-is:             docker-fu.hs
+  other-modules:       DockerFu
+  ghc-options:         -threaded -rtsopts
+  build-depends:       base
+                     , bored-robot
+                     , optparse-applicative
+                     , text
+                     , more-extensible-effects
+
 test-suite bored-robot-test
   type:                exitcode-stdio-1.0
-  hs-source-dirs:      test
+  hs-source-dirs:      test, app
   main-is:             Spec.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
   other-modules:       CI.ProcSpec
+                     , AppSpec
   build-depends:       base
                      , bytestring
                      , QuickCheck
@@ -53,6 +65,7 @@ test-suite bored-robot-test
                      , tasty-hunit
                      , tasty-quickcheck
                      , text
+                     , optparse-applicative
 
 source-repository head
   type:     git
