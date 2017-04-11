@@ -37,6 +37,16 @@ executable bored-robot
                      , bored-robot
   default-language:    Haskell2010
 
+executable docker-fu
+  hs-source-dirs:      app
+  main-is:             DockerFu.hs
+  ghc-options:         -rtsopts -main-is DockerFu.main
+  build-depends:       base
+                     , bored-robot
+                     , optparse-applicative
+                     , text
+                     , more-extensible-effects
+
 test-suite bored-robot-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
