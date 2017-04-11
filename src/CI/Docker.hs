@@ -17,7 +17,7 @@ import           Data.Maybe
 import           Data.Monoid
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
-import qualified Data.Text.Utf8              as T8
+import qualified Data.Text.Encoding          as T
 import           System.Exit                 (ExitCode (ExitFailure, ExitSuccess))
 import qualified System.Process.ListLike     as SP
 
@@ -61,8 +61,15 @@ data Docker x where
 --
 -- If one or more of the 'Image's do not exist, the 'NoSuchImage'
 -- effect will be raised.
-removeImage :: Member Docker r => Image -> [Image] -> Eff r ()
-removeImage img imgs = send (RemoveImage img imgs)
+removeImage :: Member Docker r => Image -> Eff r ()
+removeImage img = send (RemoveImage img [])
+
+removeImages
+    :: (Member Docker r, Member (Exception DockerEx) r)
+    => [Image]
+    -> Eff r ()
+removeImages [] = throwException (DockerError "Must specify images to remove")
+removeImages (i:is) = send (RemoveImage i is)
 
 -- | Build a Docker image based on instructions in a 'Path'
 --
@@ -107,7 +114,7 @@ procPushImage
 procPushImage img = do
     (status, stdout, stderr) <- docker "push" [imageRepr img]
     when (isFailure status) $
-        throwException (DockerError . T.pack . unStderr $ stderr)
+        throwException (DockerError . T.decodeUtf8 . unStderr $ stderr)
     return ()
 
 procPullImage
@@ -146,7 +153,7 @@ procRemoveImage
     -> Eff r ()
 procRemoveImage imgs = do
     (status, stdout, stderr) <- docker "rmi" (imageRepr <$> imgs)
-    when (isFailure status) (throwException (NoSuchImage (Image "wot")))
+    when (isFailure status) (throwException (DockerError . T.decodeUtf8 . unStderr $ stderr)) -- NoSuchImage (Image "wot")))
     return ()
 
 -- | Invoke the docker command line application.
