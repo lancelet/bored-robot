@@ -80,3 +80,13 @@ handleProcIO cp stdin = do
     (exitcode, outbs, errbs) <- lift $ readCreateProcessWithExitCode cp inbs
 
     return (exitcode, Stdout outbs, Stderr errbs)
+
+-------------------------------------------------------------------------------
+-- Utilities
+
+isSuccess :: ExitCode -> Bool
+isSuccess ExitSuccess = True
+isSuccess _           = False
+
+isFailure :: ExitCode -> Bool
+isFailure = not . isSuccess
