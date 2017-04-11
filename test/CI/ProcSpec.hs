@@ -43,5 +43,5 @@ stackVersionTest = testCase "invoke proc to get stack version" testAction
                          Member (Exception ProcEx) r )
                     => Eff r Text
     getStackVersion = do
-        (stdout, _) <- proc "stack" ["--version"] (Stdin BS.empty)
+        (_, stdout, _) <- proc "stack" ["--version"] (Stdin BS.empty)
         return $ T.decodeUtf8 $ unStdout stdout
