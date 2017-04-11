@@ -28,7 +28,6 @@ import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import qualified Data.Text.Encoding          as T (decodeUtf8, encodeUtf8)
 import           Debug.Trace                 (trace, traceM)
-import           Turtle.Prelude              (inproc, strict)
 
 newtype BranchName = BranchName { unBranchName :: Text } deriving (Eq, Show)
 

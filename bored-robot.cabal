@@ -15,6 +15,7 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Lib
+                     , CI.Filesystem
                      , CI.Git
                      , CI.Proc
                      , CI.ProgName
@@ -27,7 +28,7 @@ library
                      , more-extensible-effects
                      , process-extras
                      , text
-                     , turtle
+                     , vector
 
 executable bored-robot
   hs-source-dirs:      app
