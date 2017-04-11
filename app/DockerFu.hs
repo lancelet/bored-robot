@@ -24,6 +24,7 @@ import           Text.Printf
 
 -- | program options (environment in the bash script)
 data Args = Args { argRegistry   :: Text       -- ^ docker registry
+                 , argManifest   :: FilePath   -- ^ build.manifest path
 -- timestamp effect pending implementation
 --                 , argTimestamp  :: Eff r Text -- ^ effect returning a timestamp
                  , argCommand :: Command
@@ -44,6 +45,12 @@ parseArgs = Args
                         <> metavar "REGISTRY"
                         <> help "use REGISTRY as internal docker registry"
                         <> value "omnia.docker.dev.cba"
+                       )
+            <*> strOption
+                       (long "manifest"
+                        <> metavar "MANIFEST"
+                        <> help "use MANIFEST as manifest file (default ./build.manifest)"
+                        <> value "build.manifest"
                        )
             -- timestamp effect pending implementation
             -- <*> option (str >>= return . T.pack)
@@ -69,22 +76,20 @@ parse = info (helper <*> parseArgs)
               <> header "docker-fu: build magic for the awesome enterprise"
              )
 
-
 main :: IO ()
 main = do args <- execParser parse
           runAll $ dockerTodo args
-
-runAll = runLift . runTrace
-         -- runExeception . runGit .
-         -- runException . runDocker .
-         -- runException . runFs
 
 dockerTodo :: (Member Trace r) 
               => Args -> Eff r ()
 dockerTodo args = do trace "running program on build.manifest"
                      trace (show args)
-                     
 
-traceF :: (Member Trace r) => String -> Eff r ()
-traceF = trace . printf "docker-fu: %s" 
+--------------------------------------------------
+-- TODO should probably be provided by the library?
+runAll = runLift . runTrace
+         -- runExeception . runGit .
+         -- runException . runDocker .
+         -- runException . runFs
+
 
