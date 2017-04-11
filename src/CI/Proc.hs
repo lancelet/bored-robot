@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeOperators         #-}
 module CI.Proc where
 
+import qualified Control.Exception           as GHC
 import           Control.Monad.Eff
 import           Control.Monad.Eff.Exception
 import           Control.Monad.Eff.Lift
@@ -27,6 +28,8 @@ newtype Stderr = Stderr { unStderr :: ByteString } deriving (Eq, Show)
 
 -- | Exception indicating that a process failed.
 newtype ProcEx = ProcEx ExitCode deriving (Show)
+
+instance GHC.Exception ProcEx
 
 -- | Process
 data Proc x where
