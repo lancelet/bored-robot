@@ -14,6 +14,7 @@ import           Control.Monad.Catch         (MonadCatch, MonadMask, MonadThrow,
 import           Control.Monad.Eff
 import           Control.Monad.Eff.Exception
 import           Control.Monad.Eff.Lift
+import           GHC.IO.Exception            (IOErrorType(UnsatisfiedConstraints))
 import           Data.ByteString             (ByteString)
 import qualified Data.ByteString             as BS
 import           Data.Text                   (Text)
@@ -22,7 +23,9 @@ import           Data.Vector                 (Vector)
 import qualified Data.Vector                 as V
 import qualified System.Directory            as SD
 import           System.IO.Error             (isAlreadyExistsError,
-                                              isDoesNotExistError)
+                                              isDoesNotExistError,
+                                              isPermissionError,
+                                              ioeGetErrorType)
 
 -------------------------------------------------------------------------------
 -- * Types
@@ -44,13 +47,22 @@ newtype Separator = Separator { unSeparator :: Text } deriving (Eq, Show)
 
 -- | Filesystem type.
 data Filesystem x where
-    FilesystemRead               :: Path -> Filesystem ByteString
-    FilesystemListDirectory      :: Path -> Filesystem (Vector Path)
-    FilesystemDoesDirectoryExist :: Path -> Filesystem Bool
+    FilesystemRead                     :: Path -> Filesystem ByteString
+    FilesystemListDirectory            :: Path -> Filesystem (Vector Path)
+    FilesystemDoesDirectoryExist       :: Path -> Filesystem Bool
+    FilesystemDoesFileExist            :: Path -> Filesystem Bool
+    FilesystemCreateDirectoryIfMissing :: Path -> Filesystem ()
+    FilesystemWriteFile                :: Path -> ByteString -> Filesystem ()
+    FilesystemRemoveFile               :: Path -> Filesystem ()
+    FilesystemRemoveDirectory          :: Path -> Filesystem ()
 
 -- | Filesystem exceptions.
 data FilesystemEx
     = FsExFileNotFound Path
+    | FsExAlreadyExists Path
+    | FsExUnsatisfiedConstraints  -- ^ eg. directory is not empty
+    | FsExPermission
+    | FsUnknownError IOError
     deriving (Show, Eq)
 
 -------------------------------------------------------------------------------
@@ -97,6 +109,21 @@ listDirectory path = send (FilesystemListDirectory path)
 doesDirectoryExist :: (Member Filesystem r) => Path -> Eff r Bool
 doesDirectoryExist path = send (FilesystemDoesDirectoryExist path)
 
+doesFileExist :: (Member Filesystem r) => Path -> Eff r Bool
+doesFileExist path = send (FilesystemDoesFileExist path)
+
+createDirectoryIfMissing :: (Member Filesystem r) => Path -> Eff r ()
+createDirectoryIfMissing path = send (FilesystemCreateDirectoryIfMissing path)
+
+writeFile :: (Member Filesystem r) => Path -> ByteString -> Eff r ()
+writeFile path contents = send (FilesystemWriteFile path contents)
+
+removeFile :: (Member Filesystem r) => Path -> Eff r ()
+removeFile path = send (FilesystemRemoveFile path)
+
+removeDirectory :: (Member Filesystem r) => Path -> Eff r ()
+removeDirectory path = send (FilesystemRemoveDirectory path)
+
 -------------------------------------------------------------------------------
 -- * IO interpreter
 
@@ -114,6 +141,17 @@ runFilesystem = handleRelay return go
         = handleFSListDirectoryIO path >>= k
     go (FilesystemDoesDirectoryExist path) k
         = handleFSDoesDirectoryExistIO path >>= k
+    go (FilesystemDoesFileExist path) k
+        = handleFSDoesFileExistIO path >>= k
+    go (FilesystemCreateDirectoryIfMissing path) k
+        = handleFSCreateDirectoryIfMissingIO path >>= k
+    go (FilesystemWriteFile path contents) k
+        = handleFSWriteFileIO path contents >>= k
+    go (FilesystemRemoveFile path) k
+        = handleFSRemoveFileIO path >>= k
+    go (FilesystemRemoveDirectory path) k
+        = handleFSRemoveDirectoryIO path >>= k
+
 
 handleFSReadIO :: ( MemberU2 Lift (Lift IO) r
                   , Member (Exception FilesystemEx) r )
@@ -124,6 +162,8 @@ handleFSReadIO file = liftCatch action exHandler
     action = BS.readFile (pathToFilePath file)
     exHandler ioe
         | isDoesNotExistError ioe = throwException (FsExFileNotFound file)
+        | otherwise               = throwException (FsUnknownError ioe)
+
 
 handleFSListDirectoryIO :: ( MemberU2 Lift (Lift IO) r
                            , Member (Exception FilesystemEx) r )
@@ -136,6 +176,8 @@ handleFSListDirectoryIO path = liftCatch action exHandler
              <$> SD.listDirectory (pathToFilePath path)
     exHandler ioe
         | isDoesNotExistError ioe = throwException (FsExFileNotFound path)
+        | otherwise               = throwException (FsUnknownError ioe)
+
 
 handleFSDoesDirectoryExistIO :: ( MemberU2 Lift (Lift IO) r
                                 , Member (Exception FilesystemEx) r )
@@ -146,6 +188,80 @@ handleFSDoesDirectoryExistIO path = liftCatch action exHandler
     action = SD.doesDirectoryExist (pathToFilePath path)
     exHandler ioe
         | isDoesNotExistError ioe = return False
+        | otherwise               = throwException (FsUnknownError ioe)
+
+
+handleFSDoesFileExistIO :: ( MemberU2 Lift (Lift IO) r
+                           , Member (Exception FilesystemEx) r )
+                        => Path
+                        -> Eff r Bool
+handleFSDoesFileExistIO path = liftCatch action exHandler
+  where
+    action = SD.doesFileExist (pathToFilePath path)
+    exHandler ioe
+        | isDoesNotExistError ioe = return False
+        | otherwise               = throwException (FsUnknownError ioe)
+
+
+handleFSCreateDirectoryIfMissingIO :: ( MemberU2 Lift (Lift IO) r
+                                      , Member (Exception FilesystemEx) r )
+                                   => Path
+                                   -> Eff r ()
+handleFSCreateDirectoryIfMissingIO path = liftCatch action exHandler
+  where
+    action = SD.createDirectoryIfMissing True (pathToFilePath path)
+    exHandler ioe
+        | isAlreadyExistsError ioe = throwException (FsExAlreadyExists path)
+        | otherwise                = throwException (FsUnknownError ioe)
+
+
+handleFSWriteFileIO :: ( MemberU2 Lift (Lift IO) r
+                       , Member (Exception FilesystemEx) r )
+                    => Path
+                    -> ByteString
+                    -> Eff r ()
+handleFSWriteFileIO path contents = liftCatch action exHandler
+  where
+    action = BS.writeFile (pathToFilePath path) contents
+    exHandler ioe
+        | isAlreadyExistsError ioe = throwException (FsExAlreadyExists path)
+        | otherwise                = throwException (FsUnknownError ioe)
+
+
+handleFSRemoveFileIO :: ( MemberU2 Lift (Lift IO) r
+                        , Member (Exception FilesystemEx) r )
+                     => Path
+                     -> Eff r ()
+handleFSRemoveFileIO path = liftCatch action exHandler
+  where
+    action = SD.removeFile (pathToFilePath path)
+    exHandler ioe
+        | isUnsatisfiedConstraintError ioe =
+              throwException FsExUnsatisfiedConstraints
+        | otherwise =
+              throwException (FsUnknownError ioe)
+
+
+handleFSRemoveDirectoryIO :: ( MemberU2 Lift (Lift IO) r
+                             , Member (Exception FilesystemEx) r )
+                          => Path
+                          -> Eff r ()
+handleFSRemoveDirectoryIO path = liftCatch action exHandler
+  where
+    action = SD.removeDirectory (pathToFilePath path)
+    exHandler ioe
+        | isUnsatisfiedConstraintError ioe =
+              throwException FsExUnsatisfiedConstraints
+        | isPermissionError ioe =
+              throwException FsExPermission
+        | otherwise =
+              throwException (FsUnknownError ioe)
+
+
+isUnsatisfiedConstraintError :: IOError -> Bool
+isUnsatisfiedConstraintError ioe = case ioeGetErrorType ioe of
+    UnsatisfiedConstraints -> True
+    _                      -> False
 
 -------------------------------------------------------------------------------
 -- * Utilities
