@@ -16,8 +16,9 @@ import           Control.Monad.Eff.Exception
 import           Control.Monad.Eff.Lift
 import           Control.Monad.IO.Class      (liftIO, MonadIO)
 import           Crypto.Hash                 (Digest, SHA1,
-                                              digestFromByteString)
+                                              digestFromByteString, hash)
 import qualified Data.ByteString             as BS
+import           Data.ByteString             (ByteString)
 import qualified Data.ByteString.Base16      as BS16 (decode)
 import           Data.Maybe                  (fromJust)
 import           Data.Text                   (Text)
@@ -56,6 +57,9 @@ gitHeadBranch = send GitHeadBranch
 gitHeadCommit :: Member Git r => Eff r Commish
 gitHeadCommit = send GitHeadCommit
 
+-------------------------------------------------------------------------------
+-- Interpreters
+
 runGit :: forall r a.
           ( Member (Exception GitEx) r
           , Member Proc r )
@@ -67,26 +71,48 @@ runGit = handleRelay ret handle
     ret = return
 
     handle :: Handler Git r a
-    handle GitHeadBranch k = gitHeadBranchEff >>= k
-    handle GitHeadCommit k = gitHeadCommitEff >>= k
+    handle GitHeadBranch k = gitHeadBranchProc >>= k
+    handle GitHeadCommit k = gitHeadCommitProc >>= k
 
-gitHeadBranchEff :: (Member Proc r) => Eff r BranchName
-gitHeadBranchEff = do
+-- run pure with a hardcoded branch name and commish
+runTestGit :: BranchName -> Commish -> Eff (Git ': r) a -> Eff r a
+runTestGit bn c = handleRelay return handle
+  where
+    handle :: Handler Git r a
+    handle GitHeadBranch k = return bn >>= k
+    handle GitHeadCommit k = return c >>= k
+
+-- useful for creating a Commish for manual testing
+sha :: ByteString -> Digest SHA1
+sha = hash
+
+-------------------------------------------------------------------------------
+-- Helpers
+
+gitHeadBranchProc :: (Member Proc r) => Eff r BranchName
+gitHeadBranchProc = do
     (stdout, _) <- proc "git" ["symbolic-ref", "HEAD"] (Stdin BS.empty)
-    return $ BranchName $ T.decodeUtf8 $ unStdout $ stdout
+    return . BranchName . T.decodeUtf8 . unStdout $ stdout
 
-gitHeadCommitEff :: ( Member (Exception GitEx) r
-                    , Member Proc r )
-                 => Eff r Commish
-gitHeadCommitEff = do
+gitHeadCommitProc :: ( Member (Exception GitEx) r
+                     , Member Proc r )
+                  => Eff r Commish
+gitHeadCommitProc = do
     (stdout, _) <- proc "git" ["rev-parse", "HEAD"] (Stdin BS.empty)
     let txt = (T.strip . T.decodeUtf8 . unStdout) stdout
     case commishFromText txt of
         Just commish -> return commish
-        Nothing -> throwException (GitExBadCommish txt)
+        Nothing      -> throwException (GitExBadCommish txt)
 
-testBranchName :: IO (Either GitEx (Either ProcEx BranchName))
-testBranchName = runLift $ runException $ runException $ runProc $ runGit $ gitHeadBranch
+-------------------------------------------------------------------------------
+-- Utilties
 
-testHeadCommit :: IO (Either GitEx (Either ProcEx Commish))
-testHeadCommit = runLift $ runException $ runException $ runProc $ runGit $ gitHeadCommit
+runGitIO :: Eff '[Git, Proc, Exception ProcEx, Exception GitEx, Lift IO] a -> IO (Either GitEx (Either ProcEx a))
+runGitIO = runLift . runException . runException . runProc . runGit
+
+getBranchName :: IO (Either GitEx (Either ProcEx BranchName))
+getBranchName = runGitIO gitHeadBranch
+
+getHeadCommit :: IO (Either GitEx (Either ProcEx Commish))
+getHeadCommit = runGitIO gitHeadCommit
+
