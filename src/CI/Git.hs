@@ -39,6 +39,9 @@ instance Show Commish where show = show. unCommish
 commishToText :: Commish -> Text
 commishToText = T.pack . show . unCommish
 
+shortHash :: Commish -> Text
+shortHash = T.take 7 . commishToText
+
 commishFromText :: Text -> Maybe Commish
 commishFromText txt = do
     decoded <- case BS16.decode (T.encodeUtf8 txt) of
@@ -63,6 +66,9 @@ gitHeadBranch = send GitHeadBranch
 
 gitHeadCommit :: Member Git r => Eff r Commish
 gitHeadCommit = send GitHeadCommit
+
+gitHeadShortCommit :: Member Git r => Eff r Text
+gitHeadShortCommit = fmap shortHash $ send GitHeadCommit
 
 -------------------------------------------------------------------------------
 -- Interpreters
