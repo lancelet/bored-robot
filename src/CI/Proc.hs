@@ -14,7 +14,8 @@ import           Data.ByteString             (ByteString)
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import           System.Exit                 (ExitCode (ExitFailure, ExitSuccess))
-import           System.Process.ListLike     (CreateProcess, readCreateProcessWithExitCode)
+import           System.Process.ListLike     (CreateProcess,
+                                              readCreateProcessWithExitCode)
 import qualified System.Process.ListLike     as SP (proc)
 
 -------------------------------------------------------------------------------
@@ -29,7 +30,7 @@ data ProcEx = ProcEx ExitCode deriving (Show)
 
 -- | Process
 data Proc x where
-    Proc :: CreateProcess -> Stdin -> Proc (Stdout, Stderr)
+    Proc :: CreateProcess -> Stdin -> Proc (ExitCode, Stdout, Stderr)
 
 -------------------------------------------------------------------------------
 -- Language
@@ -38,7 +39,7 @@ data Proc x where
 --
 --   This runs a process, waiting for the process to complete before returning
 --   with results. The process is specified by a 'CreateProcess' value.
-proccp :: Member Proc r => CreateProcess -> Stdin -> Eff r (Stdout, Stderr)
+proccp :: Member Proc r => CreateProcess -> Stdin -> Eff r (ExitCode, Stdout, Stderr)
 proccp cp stdin = send (Proc cp stdin)
 
 -- | Runs a process strictly.
@@ -46,7 +47,7 @@ proccp cp stdin = send (Proc cp stdin)
 --   This runs a process, waiting for the process to complete before returning
 --   with results. The process is specified by a 'FilePath' and a list of
 --   arguments.
-proc :: Member Proc r => FilePath -> [Text] -> Stdin -> Eff r (Stdout, Stderr)
+proc :: Member Proc r => FilePath -> [Text] -> Stdin -> Eff r (ExitCode, Stdout, Stderr)
 proc fp args stdin = proccp cp stdin
   where
     cp = SP.proc fp (T.unpack <$> args)
@@ -68,11 +69,11 @@ handleProcIO :: ( MemberU2 Lift (Lift IO) r
                 , Member (Exception ProcEx) r )
              => CreateProcess
              -> Stdin
-             -> Eff r (Stdout, Stderr)
+             -> Eff r (ExitCode, Stdout, Stderr)
 handleProcIO cp stdin = do
 
     -- run the process to completion in IO
     let inbs = unStdin stdin
     (exitcode, outbs, errbs) <- lift $ readCreateProcessWithExitCode cp inbs
-   
-    return (Stdout outbs, Stderr errbs)
+
+    return (exitcode, Stdout outbs, Stderr errbs)
