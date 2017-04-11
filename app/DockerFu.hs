@@ -76,10 +76,6 @@ parse = info (helper <*> parseArgs)
               <> header "docker-fu: build magic for the awesome enterprise"
              )
 
-main :: IO ()
-main = do args <- execParser parse
-          runAll $ dockerTodo args
-
 dockerTodo :: (Member Trace r) 
               => Args -> Eff r ()
 dockerTodo args = do trace "running program on build.manifest"

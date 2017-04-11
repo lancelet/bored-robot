@@ -39,8 +39,9 @@ executable bored-robot
 
 executable docker-fu
   hs-source-dirs:      app
-  main-is:             DockerFu.hs
-  ghc-options:         -rtsopts -main-is DockerFu.main
+  main-is:             docker-fu.hs
+  other-modules:       DockerFu
+  ghc-options:         -threaded -rtsopts
   build-depends:       base
                      , bored-robot
                      , optparse-applicative
