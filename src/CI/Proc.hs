@@ -20,12 +20,12 @@ import qualified System.Process.ListLike     as SP (proc)
 -------------------------------------------------------------------------------
 -- Types
 
-newtype Stdin = Stdin { unStdin :: ByteString } deriving (Eq, Show)
+newtype Stdin  = Stdin { unStdin :: ByteString } deriving (Eq, Show)
 newtype Stdout = Stdout { unStdout :: ByteString } deriving (Eq, Show)
 newtype Stderr = Stderr { unStderr :: ByteString } deriving (Eq, Show)
 
 -- | Exception indicating that a process failed.
-data ProcEx = ProcEx ExitCode deriving (Show)
+newtype ProcEx = ProcEx ExitCode deriving (Show)
 
 -- | Process
 data Proc x where
@@ -47,7 +47,7 @@ proccp cp stdin = send (Proc cp stdin)
 --   with results. The process is specified by a 'FilePath' and a list of
 --   arguments.
 proc :: Member Proc r => FilePath -> [Text] -> Stdin -> Eff r (Stdout, Stderr)
-proc fp args stdin = proccp cp stdin
+proc fp args = proccp cp
   where
     cp = SP.proc fp (T.unpack <$> args)
 
