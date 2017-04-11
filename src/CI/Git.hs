@@ -14,7 +14,7 @@ import           Control.Applicative         (empty)
 import           Control.Monad.Eff
 import           Control.Monad.Eff.Exception
 import           Control.Monad.Eff.Lift
-import           Control.Monad.IO.Class      (liftIO, MonadIO)
+import           Control.Monad.IO.Class      (MonadIO, liftIO)
 import           Crypto.Hash                 (Digest, SHA1,
                                               digestFromByteString)
 import qualified Data.ByteString             as BS
@@ -22,7 +22,7 @@ import qualified Data.ByteString.Base16      as BS16 (decode)
 import           Data.Maybe                  (fromJust)
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
-import qualified Data.Text.Encoding          as T (encodeUtf8, decodeUtf8)
+import qualified Data.Text.Encoding          as T (decodeUtf8, encodeUtf8)
 import           Debug.Trace                 (trace, traceM)
 import           Turtle.Prelude              (inproc, strict)
 
@@ -72,18 +72,18 @@ runGit = handleRelay ret handle
 
 gitHeadBranchEff :: (Member Proc r) => Eff r BranchName
 gitHeadBranchEff = do
-    (stdout, _) <- proc "git" ["symbolic-ref", "HEAD"] (Stdin BS.empty)
+    (_, stdout, _) <- proc "git" ["symbolic-ref", "HEAD"] (Stdin BS.empty)
     return $ BranchName $ T.decodeUtf8 $ unStdout $ stdout
 
 gitHeadCommitEff :: ( Member (Exception GitEx) r
                     , Member Proc r )
                  => Eff r Commish
 gitHeadCommitEff = do
-    (stdout, _) <- proc "git" ["rev-parse", "HEAD"] (Stdin BS.empty)
+    (_, stdout, _) <- proc "git" ["rev-parse", "HEAD"] (Stdin BS.empty)
     let txt = (T.strip . T.decodeUtf8 . unStdout) stdout
     case commishFromText txt of
         Just commish -> return commish
-        Nothing -> throwException (GitExBadCommish txt)
+        Nothing      -> throwException (GitExBadCommish txt)
 
 testBranchName :: IO (Either GitEx (Either ProcEx BranchName))
 testBranchName = runLift $ runException $ runException $ runProc $ runGit $ gitHeadBranch
