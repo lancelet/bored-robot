@@ -1,14 +1,16 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DataKinds #-}
 module Main where
 
-import Control.Applicative
 import Data.Monoid
 import Control.Monad.Eff
 import Control.Monad.Eff.Trace
 import Control.Monad.Eff.Exception
 import Control.Monad.Eff.Lift
 import qualified Data.Text as T
+import System.Environment
+import Data.String
 
 import CI.Proc
 import CI.ProgName
@@ -19,27 +21,22 @@ import CI.Filesystem
 
 main :: IO ()
 main = do
-    r <- runStack $ doiit "example" (Image "example" $ Tag "candidate") Nothing
+    [path, name, tag] <- getArgs
+    let path' = fromString path
+    r <- runStack $ doiit path' (Image (T.pack name) (Tag $ T.pack tag)) Nothing
     case r of
-        Right (Right (Right img)) -> print img
-        Left err -> print err
+        Right (Right (Right (Right img))) -> print img
+        err -> print err
 
 runStack
-    ::
-      ( Member Docker r
-      , Member (Exception DockerEx) r
-      , Member CurrentTime r
-      , Member ProgName r
-      , Member Filesystem r
-      , Member (Exception FilesystemEx) r
-      , Member Trace r
-      , Member (Exception ProcEx) r
-      , Member Proc r
-      , Member (Lift IO) r)
-    => Eff r a
-    -> IO (Either DockerEx (Either ProcEx (Either FilesystemEx a)))
-runStack = runLift . runTrace . runException . runException . runException . runFilesystem . runProc . runDocker . runProgName . runCurrentTime
--- runLift . runException . runException . runException . runTrace . runProc . runFilesystem . runDocker . runProgName . runCurrentTime
+    :: Eff '[ CurrentTime, ProgName, Docker, Git, Proc, Filesystem,
+             Exception FilesystemEx, Exception ProcEx, Exception DockerEx,
+             Exception GitEx, Trace, Lift IO] a
+    -> IO (Either GitEx (Either DockerEx (Either ProcEx (Either FilesystemEx a))))
+runStack =
+    runLift . runTrace . runException . runException . runException . runException .
+    runFilesystem . runProc . runGit . runDocker . runProgName . runCurrentTime
+
 
 doiit :: ( Member Docker r
         , Member (Exception DockerEx) r
@@ -57,7 +54,7 @@ doiit path target tag = do
     prog <- progName
     ts <- printCurrentTime ymDHMS
     trace $ "Executing " <> T.unpack prog <> " as at " <> ts
-    img <- buildImage (filePathToPath "hello/my/friend") target
+    img <- buildImage path target
     img' <- case tag of
         Just t -> tagImage img t
         Nothing -> pure img
