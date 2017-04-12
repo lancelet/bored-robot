@@ -12,18 +12,14 @@ import           Control.Applicative
 import           Control.Monad               (when)
 import           Control.Monad.Eff
 import           Control.Monad.Eff.Exception
-import           Control.Monad.Eff.Lift
 import           Control.Monad.Eff.Trace
-import           Data.ByteString             (ByteString)
 import qualified Data.ByteString             as BS
 import           Data.Char                   (isSpace)
-import           Data.Maybe
 import           Data.Monoid
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import qualified Data.Text.Encoding          as T
-import           System.Exit                 (ExitCode (ExitFailure, ExitSuccess))
-import qualified System.Process.ListLike     as SP
+import           System.Exit                 (ExitCode)
 
 import CI.Filesystem as FS
 import CI.Proc       as Proc
@@ -130,7 +126,7 @@ procPushImage
     => Image
     -> Eff r ()
 procPushImage img = do
-    (status, stdout, stderr) <- docker "push" [imageRepr img]
+    (status, _stdout, stderr) <- docker "push" [imageRepr img]
     when (isFailure status) $ throwException (parseError stderr)
     return ()
 
@@ -141,7 +137,7 @@ procPullImage
     => Image
     -> Eff r ()
 procPullImage img = do
-    (status, stdout, stderr) <- docker "pull" [imageRepr img]
+    (status, _stdout, stderr) <- docker "pull" [imageRepr img]
     when (isFailure status) $ throwException (parseError stderr)
     return ()
 
@@ -153,7 +149,7 @@ procBuildImage
     -> Image
     -> Eff r Image
 procBuildImage path img = do
-    (status, stdout, stderr) <- docker "build" ["--tag", imageRepr img, pathToText unixSeparator path]
+    (status, _stdout, stderr) <- docker "build" ["--tag", imageRepr img, pathToText unixSeparator path]
     when (isFailure status) $ throwException (parseError stderr)
     -- TODO Parse correct output
     return img
@@ -168,8 +164,8 @@ procTagImage
     => Image
     -> Tag
     -> Eff r Image
-procTagImage img@(Image name tag) tag' = do
-    (status, stdout, stderr) <- docker "tag" [imageRepr img, name <> ":" <> tagRepr tag']
+procTagImage img@(Image name _tag) tag' = do
+    (status, _stdout, stderr) <- docker "tag" [imageRepr img, name <> ":" <> tagRepr tag']
     when (isFailure status) $
         -- TODO Parse the error and throw correct exception
         when (isFailure status) $ throwException (parseError stderr)
@@ -181,7 +177,7 @@ procRemoveImage
     => [Image]
     -> Eff r ()
 procRemoveImage imgs = do
-    (status, stdout, stderr) <- docker "rmi" (imageRepr <$> imgs)
+    (status, _stdout, stderr) <- docker "rmi" (imageRepr <$> imgs)
     -- TODO: Parse actual response.
     when (isFailure status) $ throwException (parseError stderr)
     return ()
@@ -198,7 +194,7 @@ parseError (Stderr stderr) =
         if T.isInfixOf "No such image:" err
         then case T.splitOn ":" (T.takeWhileEnd (/= ' ') err) of
                  [name, tag] -> Just $ NoSuchImage (Image name (Tag tag))
-                 other       -> Nothing
+                 _           -> Nothing
         else Nothing
 
 -- | Invoke the docker command line application.
@@ -240,7 +236,7 @@ traceBuildImage path img = do
 traceTagImage
     :: (Member Trace r, Member (Exception DockerEx) r)
     => Image -> Tag -> Eff r Image
-traceTagImage img@(Image name tag) tag' = do
+traceTagImage img@(Image name _tag) tag' = do
     let img' = Image name tag'
     trace . T.unpack $ "docker tag " <> imageRepr img <> " " <> imageRepr img'
     return img'
