@@ -67,7 +67,7 @@ gitHeadCommit :: Member Git r => Eff r Commish
 gitHeadCommit = send GitHeadCommit
 
 gitHeadShortCommit :: Member Git r => Eff r Text
-gitHeadShortCommit = fmap shortHash $ send GitHeadCommit
+gitHeadShortCommit = shortHash <$> send GitHeadCommit
 
 -------------------------------------------------------------------------------
 -- Interpreters

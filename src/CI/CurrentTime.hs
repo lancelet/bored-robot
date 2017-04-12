@@ -31,7 +31,6 @@ ymDHMS = "%Y%m%d%H%M%S"
 
 runCurrentTime :: MemberU2 Lift (Lift IO) r => Eff (CurrentTime ': r) a -> Eff r a
 runCurrentTime = handleRelay return (\CurrentTime k -> lift currentLocalTime >>= k)
-  where printCurrentTime fmt = fmap (printTime fmt) currentLocalTime
 
 runTestCurrentTime :: LocalTime -> Eff (CurrentTime ': r) a -> Eff r a
 runTestCurrentTime lt = handleRelay return (\CurrentTime k -> k lt)

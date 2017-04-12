@@ -175,8 +175,7 @@ handleFSListDirectoryIO :: ( MemberU2 Lift (Lift IO) r
                         -> Eff r (Vector Path)
 handleFSListDirectoryIO path = liftCatch action exHandler
   where
-    action = V.fromList
-             <$> fmap filePathToPath
+    action = V.fromList . fmap filePathToPath
              <$> SD.listDirectory (pathToFilePath path)
     exHandler ioe
         | isDoesNotExistError ioe = throwException (FsExFileNotFound path)

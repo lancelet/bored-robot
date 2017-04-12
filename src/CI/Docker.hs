@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeOperators         #-}
+
 module CI.Docker where
 
 import           Control.Applicative
@@ -91,8 +92,7 @@ buildImage
     -> Image
     -> Eff r Image
 buildImage path image = do
-    img <- send (BuildImage path image)
-    return img
+    send (BuildImage path image)
 
 -- | Apply a 'Tag' to a Docker 'Image'.
 tagImage :: Member Docker r => Image -> Tag -> Eff r Image
@@ -191,7 +191,7 @@ parseError
     -> DockerEx
 parseError (Stderr stderr) =
     let err = T.dropAround isSpace . T.decodeUtf8 $ stderr
-    in maybe (error $ "Failed to parse a docker error: " <> T.unpack err) (id) (isNoSuchImage err <|> isUnknownError err)
+    in fromMaybe (error $ "Failed to parse a docker error: " <> T.unpack err) (isNoSuchImage err <|> isUnknownError err)
   where
     isUnknownError err = Just (DockerError err)
     isNoSuchImage err =
@@ -234,7 +234,7 @@ traceBuildImage
     :: (Member Trace r, Member (Exception DockerEx) r)
     => Path -> Image -> Eff r Image
 traceBuildImage path img = do
-    trace . T.unpack $ "docker build --tag " <> imageRepr img <> " " <> (pathToText unixSeparator path)
+    trace . T.unpack $ "docker build --tag " <> imageRepr img <> " " <> pathToText unixSeparator path
     return img
 
 traceTagImage
