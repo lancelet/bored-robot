@@ -7,12 +7,14 @@
 {-# LANGUAGE TypeOperators         #-}
 module CI.Docker where
 
+import           Control.Applicative
 import           Control.Monad               (when)
 import           Control.Monad.Eff
 import           Control.Monad.Eff.Exception
 import           Control.Monad.Eff.Lift
 import           Data.ByteString             (ByteString)
 import qualified Data.ByteString             as BS
+import           Data.Char                   (isSpace)
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Text                   (Text)
@@ -35,8 +37,11 @@ instance Show Tag where
     show = show . tagRepr
 
 -- | A Docker image name.
-newtype Image = Image { imageRepr :: Text }
+data Image = Image { imageName :: Text, imageTag :: Tag }
     deriving (Eq, Ord)
+
+imageRepr :: Image -> Text
+imageRepr (Image img tag) = img <> ":" <> tagRepr tag
 
 instance Show Image where
     show = show . imageRepr
@@ -50,8 +55,8 @@ data DockerEx
 -- | Docker effects.
 data Docker x where
     RemoveImage :: Image -> [Image] -> Docker ()
-    BuildImage  :: Path -> Docker Image
-    TagImage    :: Image -> Tag -> Docker ()
+    BuildImage  :: Path -> Tag -> Docker Image
+    TagImage    :: Image -> Tag -> Docker Image
     PushImage   :: Image -> Docker ()
     PullImage   :: Image -> Docker ()
 
@@ -82,15 +87,14 @@ removeImages (i:is) = send (RemoveImage i is)
 buildImage
     :: Member Docker r
     => Path
-    -> Maybe Tag
+    -> Tag
     -> Eff r Image
 buildImage path tag = do
-    img <- send (BuildImage path)
-    maybe (pure ()) (tagImage img) tag
+    img <- send (BuildImage path tag)
     return img
 
 -- | Apply a 'Tag' to a Docker 'Image'.
-tagImage :: Member Docker r => Image -> Tag -> Eff r ()
+tagImage :: Member Docker r => Image -> Tag -> Eff r Image
 tagImage img tag = send (TagImage img tag)
 
 -- | Push a Docker 'Image' to a registry.
@@ -113,7 +117,7 @@ runDocker = handleRelay return handle
   where
     handle :: Handler Docker r a
     handle (RemoveImage img imgs) k = procRemoveImage (img:imgs) >>= k
-    handle (BuildImage path)      k = procBuildImage path >>= k
+    handle (BuildImage path tag)  k = procBuildImage path tag >>= k
     handle (TagImage img tag)     k = procTagImage img tag >>= k
     handle (PushImage img)        k = procPushImage img >>= k
     handle (PullImage img)        k = procPullImage img >>= k
@@ -125,8 +129,7 @@ procPushImage
     -> Eff r ()
 procPushImage img = do
     (status, stdout, stderr) <- docker "push" [imageRepr img]
-    when (isFailure status) $
-        throwException (DockerError . T.decodeUtf8 . unStderr $ stderr)
+    when (isFailure status) $ throwException (parseError stderr)
     return ()
 
 procPullImage
@@ -136,6 +139,7 @@ procPullImage
     -> Eff r ()
 procPullImage img = do
     (status, stdout, stderr) <- docker "pull" [imageRepr img]
+    when (isFailure status) $ throwException (parseError stderr)
     return ()
 
 -- | Build a Docker 'Image' using the @Dockerfile@ in a directory.
@@ -143,10 +147,13 @@ procBuildImage
     :: ( Member Proc r
       , Member (Exception DockerEx) r)
     => Path -- ^ Directory containing the @Dockerfile@
+    -> Tag
     -> Eff r Image
-procBuildImage path = do
+procBuildImage path tag = do
     (status, stdout, stderr) <- docker "build" [path]
-    return (Image "yay!")
+    when (isFailure status) $ throwException (parseError stderr)
+    -- TODO Parse correct output
+    return (Image "yay!" tag)
 
 -- | Tag a Docker 'Image' with a 'Tag'.
 --
@@ -157,13 +164,13 @@ procTagImage
        Member (Exception DockerEx) r)
     => Image
     -> Tag
-    -> Eff r ()
-procTagImage img tag = do
-    (status, stdout, stderr) <- docker "tag" [imageRepr img, imageRepr img <> ":" <> tagRepr tag]
+    -> Eff r Image
+procTagImage img@(Image name tag) tag' = do
+    (status, stdout, stderr) <- docker "tag" [imageRepr img, name <> ":" <> tagRepr tag']
     when (isFailure status) $
         -- TODO Parse the error and throw correct exception
-        throwException (NoSuchImage img)
-    return ()
+        when (isFailure status) $ throwException (parseError stderr)
+    return (Image name tag')
 
 procRemoveImage
     :: ( Member Proc r
@@ -173,8 +180,23 @@ procRemoveImage
 procRemoveImage imgs = do
     (status, stdout, stderr) <- docker "rmi" (imageRepr <$> imgs)
     -- TODO: Parse actual response.
-    when (isFailure status) (throwException (DockerError . T.decodeUtf8 . unStderr $ stderr))
+    when (isFailure status) $ throwException (parseError stderr)
     return ()
+
+parseError
+    :: Stderr
+    -> DockerEx
+parseError (Stderr stderr) =
+    let err = T.dropAround isSpace . T.decodeUtf8 $ stderr
+    in maybe (error $ "Failed to parse a docker error: " <> T.unpack err) (id) (isNoSuchImage err <|> isUnknownError err)
+  where
+    isUnknownError err = Just (DockerError err)
+    isNoSuchImage err =
+        if T.isInfixOf "No such image:" err
+        then case T.splitOn ":" (T.takeWhileEnd (/= ' ') err) of
+                 [name, tag] -> Just $ NoSuchImage (Image name (Tag tag))
+                 other       -> Nothing
+        else Nothing
 
 -- | Invoke the docker command line application.
 docker

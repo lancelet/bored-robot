@@ -27,6 +27,11 @@ test = testGroup "DockerSpec Tests"
     , tagMissingImageTest
     ]
 
+assertMissingImageError expected error =
+    case error of
+        NoSuchImage img -> assertBool ("Expected missing image " <> show expected <> " but got " <> show img) (img == expected)
+        _ -> assertFailure $ "Expected NoSuchImage error but got " <> show error
+
 -- | NB: This test ACTUALLY occurs in IO.
 deleteImageTest :: TestTree
 deleteImageTest = testCase "delete a [missing] image" testAction
@@ -36,8 +41,7 @@ deleteImageTest = testCase "delete a [missing] image" testAction
         r <- action
         case r of
             Left err -> assertFailure $ "Couldn't run commands: " <> show err
-            Right (Left (NoSuchImage img)) -> assertBool ("Error reported wrong missing image: " <> show img) $ img == target
-            Right (Left err) -> assertFailure $ "Unexpected error:" <> show err
+            Right (Left err) -> assertMissingImageError target err
             Right (Right ())  -> assertFailure "Expected to fail"
         return ()
 
@@ -45,7 +49,7 @@ deleteImageTest = testCase "delete a [missing] image" testAction
     action = runLift $ runException $ runException $ runProc $ runDocker $ deleteAnImage
 
     target :: Image
-    target = Image "ahahahahahah"
+    target = Image "ahahahahahah" (Tag "hullo")
 
     deleteAnImage :: ( Member Proc r
                     , Member Docker r
@@ -62,20 +66,19 @@ tagMissingImageTest = testCase "tag a [missing] image" testAction
         r <- action
         case r of
             Left err -> assertFailure $ "Couldn't run commands: " <> show err
-            Right (Left (NoSuchImage img)) -> assertBool ("Error reported wrong missing image: " <> show img) $ img == target
-            Right (Left err) -> assertFailure $ "Unexpected error:" <> show err
-            Right (Right ())  -> assertFailure "Expected to fail"
+            Right (Left err) -> assertMissingImageError target err
+            Right (Right (Image{}))  -> assertFailure "Expected to fail"
         return ()
 
-    action :: IO (Either ProcEx (Either DockerEx ()))
+    action :: IO (Either ProcEx (Either DockerEx Image))
     action = runLift $ runException $ runException $ runProc $ runDocker $ tagAnImage
 
     target :: Image
-    target = Image "ahahahahahah"
+    target = Image "ahahahahahah" (Tag "what")
 
     tagAnImage :: ( Member Proc r
                     , Member Docker r
                     , Member (Exception DockerEx) r )
-                    => Eff r ()
+                    => Eff r Image
     tagAnImage = tagImage target (Tag "excrescence")
 
