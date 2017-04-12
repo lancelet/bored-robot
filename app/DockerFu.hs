@@ -20,6 +20,7 @@ import           Data.Maybe (mapMaybe)
 import           Data.Text(Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
+import qualified Debug.Trace as DT
 
 import           Control.Monad.Eff
 import           Control.Monad.Eff.Lift
@@ -148,16 +149,25 @@ forManifest Args{..} = do tasks   <- worklist argManifest
 
 data ManifestLine = ManifestLine
     { mfImage :: Image
-    , mfPath  :: Path }
+    , mfPath  :: Path
+    } deriving (Show)
     
 -- TODO: better parsing
 parseManifest :: Text -> Maybe [ManifestLine]  -- TODO: better errors
-parseManifest txt = sequence (fmap parseLine filteredLines)
+parseManifest txt = do
+    sequence (fmap parseLine filteredLines)
   where
+
+    filteredLines :: [Text]
+    filteredLines = ( filter (not . T.null . T.strip)
+                    . fmap (T.takeWhile (/= '#'))
+                    . T.lines
+                    ) txt
+
     parseLine :: Text -> Maybe ManifestLine
     parseLine t =
-        case T.split isSpace t of
-            (imgTxt : pathTxt : []) -> do
+        case filter (not . T.null) (map T.strip (T.split isSpace t)) of
+            [imgTxt, pathTxt] -> do
                 img <- parseImage (T.strip imgTxt)
                 let path = FS.textToPath FS.unixSeparator (T.strip pathTxt)
                 return $ ManifestLine img path
@@ -165,13 +175,10 @@ parseManifest txt = sequence (fmap parseLine filteredLines)
 
     parseImage :: Text -> Maybe Image
     parseImage txt = do
-        let (name, tag) = T.break (== ':') txt
-        if ((not . T.null) name) && ((not . T.null) tag)
-            then Just $ Image name (Tag tag)
-            else Nothing
+        case T.split (== ':') txt of
+            [name, tag] -> do
+                if ((not . T.null) name) && ((not . T.null) tag)
+                    then Just $ Image name (Tag tag)
+                    else Nothing
+            _ -> Nothing
 
-    filteredLines :: [Text]
-    filteredLines = ( filter (not . T.null . T.strip)
-                    . fmap (T.takeWhile (/= '#'))
-                    . T.lines
-                    ) txt
