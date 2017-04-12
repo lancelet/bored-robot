@@ -10,11 +10,10 @@
 
 module DockerFu where
 
-import           CI.Env
 import           CI.Docker
 import qualified CI.Docker.Parse as Docker
 import           CI.Git
-import           CI.Proc(Proc, ProcEx, runProc)
+import           CI.Proc(Proc)
 import           CI.Filesystem (Path, Filesystem)
 import qualified CI.Filesystem as FS
 
@@ -93,16 +92,6 @@ dockerTodo :: (Member Trace r)
               => Args -> Eff r ()
 dockerTodo args = do trace "running program on build.manifest"
                      trace (show args)
-
-runStack
-    :: Eff '[ Docker, Git, Proc, Filesystem,
-             Exception FS.FilesystemEx, Exception ProcEx, Exception DockerEx,
-             Exception GitEx, Trace, Lift IO] a
-    -> IO (Either GitEx (Either DockerEx (Either ProcEx (Either FS.FilesystemEx a))))
-runStack =
-    runLift . runTrace .
-    runException . runException . runException . runException .
-    FS.runFilesystem . runProc . runGit . runDocker
 
 {-
 --------------------------------------------------
