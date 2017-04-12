@@ -10,6 +10,7 @@
 module DockerFu where
 
 import CI.Docker
+import qualified CI.Docker.Parse as Docker
 import           CI.Filesystem (Path, Filesystem)
 import qualified CI.Filesystem as FS
 
@@ -136,7 +137,20 @@ data DockerFuException
     deriving (Eq, Show)
 
 parseDockerfile :: Text -> Maybe Dockerfile
-parseDockerfile = error "parseDockerfile not implemented - see Luke"
+parseDockerfile t =
+    let
+        s = T.unpack t
+        edf = Docker.parseString s
+    in
+        case edf of
+            Right df ->
+                case Docker.getFroms df of
+                    [Docker.TaggedImage i t] -> Just Dockerfile
+                        { dfFrom = Image (T.pack i) (Tag . T.pack $ t)
+                        , dfLines = length df - 1
+                        }
+                    _ -> Nothing
+            Left _ -> Nothing
 
 readAndParseDockerfile :: ( Member Filesystem r
                           , Member (Exception DockerFuException) r )
