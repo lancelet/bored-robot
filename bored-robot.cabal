@@ -16,6 +16,7 @@ cabal-version:       >=1.10
 library
   exposed-modules:     Lib
                      , CI.CurrentTime
+                     , CI.Docker.Parse
                      , CI.Filesystem
                      , CI.Git
                      , CI.Docker
@@ -30,6 +31,7 @@ library
                      , cryptonite
                      , directory
                      , exceptions
+                     , language-dockerfile
                      , more-extensible-effects
                      , process-extras
                      , text
