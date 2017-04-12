@@ -12,6 +12,7 @@ import           Control.Monad               (when)
 import           Control.Monad.Eff
 import           Control.Monad.Eff.Exception
 import           Control.Monad.Eff.Lift
+import           Control.Monad.Eff.Trace
 import           Data.ByteString             (ByteString)
 import qualified Data.ByteString             as BS
 import           Data.Char                   (isSpace)
@@ -49,6 +50,7 @@ instance Show Image where
 -- | Exceptions which may be raised by Docker effects.
 data DockerEx
     = DockerError { errorMessage :: Text } -- ^ Unknown error from Docker.
+    | MissingArguments { errorMessage :: Text } -- ^ Report missing mandatory arguments.
     | NoSuchImage { missingImage :: Image } -- ^ An operation failed because an image was missing.
     deriving (Show)
 
@@ -122,6 +124,7 @@ runDocker = handleRelay return handle
     handle (PushImage img)        k = procPushImage img >>= k
     handle (PullImage img)        k = procPullImage img >>= k
 
+-- | Push a Docker 'Image' to a remote.
 procPushImage
     :: ( Member Proc r
       , Member (Exception DockerEx) r)
@@ -132,6 +135,7 @@ procPushImage img = do
     when (isFailure status) $ throwException (parseError stderr)
     return ()
 
+-- | Pull a Docker 'Image'.
 procPullImage
     :: ( Member Proc r
       , Member (Exception DockerEx) r)
@@ -205,3 +209,49 @@ docker
     -> [Text] -- ^ Arguments.
     -> Eff r (ExitCode, Stdout, Stderr)
 docker cmd args = proc "docker" (cmd:args) (Stdin BS.empty)
+
+runDockerTrace
+    :: forall r a.
+      (Member Trace r, Member (Exception DockerEx) r)
+    => Eff (Docker ': r) a
+    -> Eff r a
+runDockerTrace = handleRelay return handle
+  where
+    handle :: Handler Docker r a
+    handle (RemoveImage img imgs) k = traceRemoveImage (img:imgs) >>= k
+    handle (BuildImage path tag)  k = traceBuildImage path tag >>= k
+    handle (TagImage img tag)     k = traceTagImage img tag >>= k
+    handle (PushImage img)        k = tracePushImage img >>= k
+    handle (PullImage img)        k = tracePullImage img >>= k
+
+traceRemoveImage
+    :: ( Member Trace r, Member (Exception DockerEx) r)
+    => [Image]
+    -> Eff r ()
+traceRemoveImage [] = throwException (MissingArguments "Cannot remove images if you don't give me images!")
+traceRemoveImage is = trace $ "docker rmi " <> unwords (T.unpack . imageRepr <$> is)
+
+traceBuildImage
+    :: (Member Trace r, Member (Exception DockerEx) r)
+    => Path -> Tag -> Eff r Image
+traceBuildImage path tag = throwException (DockerError "traceBuildImage unimplemented")
+
+traceTagImage
+    :: (Member Trace r, Member (Exception DockerEx) r)
+    => Image -> Tag -> Eff r Image
+traceTagImage img@(Image name tag) tag' = do
+    let img' = Image name tag'
+    trace . T.unpack $ "docker tag " <> imageRepr img <> " " <> imageRepr img'
+    return img'
+
+tracePushImage
+    :: (Member Trace r, Member (Exception DockerEx) r)
+    => Image -> Eff r ()
+tracePushImage img = do
+    trace $ "docker push " <> T.unpack (imageRepr img)
+
+tracePullImage
+    :: (Member Trace r, Member (Exception DockerEx) r)
+    => Image -> Eff r ()
+tracePullImage img = do
+    trace $ "docker pull " <> T.unpack (imageRepr img)
