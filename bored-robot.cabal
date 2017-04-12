@@ -15,11 +15,13 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Lib
+                     , CI.CurrentTime
                      , CI.Filesystem
                      , CI.Git
                      , CI.Proc
                      , CI.ProgName
   default-language:    Haskell2010
+  ghc-options:         -Wall
   hs-source-dirs:      src
   build-depends:       base >= 4.7 && < 5
                      , base16-bytestring
@@ -30,6 +32,7 @@ library
                      , more-extensible-effects
                      , process-extras
                      , text
+                     , time
                      , vector
 
 executable bored-robot
