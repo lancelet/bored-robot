@@ -12,7 +12,6 @@ import           Data.Text                   (Text)
 import           Data.Map.Lazy               (Map)
 import qualified Data.Map.Lazy               as Map
 import qualified Data.Text                   as T
-import qualified Data.Text.Encoding          as T (decodeUtf8, encodeUtf8)
 import           Data.Maybe                  (fromMaybe)
 import           System.Environment
 
@@ -38,13 +37,13 @@ runEnv :: forall r a.
 runEnv = handleRelay return handle
   where
     handle :: Handler Env r a
-    handle (EnvRead key) k = lift (lookup key) >>= k
+    handle (EnvRead key) k = lift (lookupEnvText key) >>= k
 
-    lookup :: Text -> IO (Maybe Text)
-    lookup = fmap (fmap T.pack) . lookupEnv . T.unpack
+    lookupEnvText :: Text -> IO (Maybe Text)
+    lookupEnvText = fmap (fmap T.pack) . lookupEnv . T.unpack
 
 runTestEnv :: Map Text Text -> Eff (Env ': r) a -> Eff r a
-runTestEnv map = handleRelay return handle
+runTestEnv fakeData = handleRelay return handle
   where
     handle :: Handler Env r a
-    handle (EnvRead key) k = k (Map.lookup key map)
+    handle (EnvRead key) k = k (Map.lookup key fakeData)
