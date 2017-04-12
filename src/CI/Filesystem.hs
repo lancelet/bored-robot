@@ -17,6 +17,7 @@ import           Control.Monad.Eff.Lift
 import           GHC.IO.Exception            (IOErrorType(UnsatisfiedConstraints))
 import           Data.ByteString             (ByteString)
 import qualified Data.ByteString             as BS
+import           Data.String                 (IsString(..))
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import           Data.Vector                 (Vector)
@@ -35,6 +36,9 @@ data Path = Path
     { pathComponents :: Vector Text
     , pathType       :: PathType
     } deriving (Eq, Show)
+
+instance IsString Path where
+    fromString = textToPath unixSeparator . T.pack
 
 -- | Indicates whether a path is absolute or relative.
 data PathType
@@ -92,10 +96,10 @@ pathToText sep path = T.concat [ prefix, txtPath ]
               $ pathComponents path
 
 pathToFilePath :: Path -> FilePath
-pathToFilePath = T.unpack . (pathToText unixSeparator)
+pathToFilePath = T.unpack . pathToText unixSeparator
 
 filePathToPath :: FilePath -> Path
-filePathToPath = (textToPath unixSeparator) . T.pack
+filePathToPath = fromString
 
 -------------------------------------------------------------------------------
 -- * Filesystem language
