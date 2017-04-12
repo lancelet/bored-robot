@@ -9,9 +9,13 @@
 
 module DockerFu where
 
-import           Options.Applicative
-import           Data.Monoid
+import CI.Docker
+import           CI.Filesystem (Path)
+import qualified CI.Filesystem as FS
 
+import           Options.Applicative
+import           Data.Char (isSpace)
+import           Data.Monoid
 import           Data.Maybe (mapMaybe)
 import           Data.Text(Text)
 import qualified Data.Text as T
@@ -82,6 +86,7 @@ dockerTodo :: (Member Trace r)
 dockerTodo args = do trace "running program on build.manifest"
                      trace (show args)
 
+{-
 --------------------------------------------------
 -- TODO should probably be provided by the library?
 runAll = runLift . runTrace
@@ -137,6 +142,7 @@ forManifest Args{..} = do tasks   <- worklist argManifest
                            other   -> forM (job other) tasks -- TODO 
                           
 
+-}
 -------------------------------------------------------------------------------
 -- * Parsing manifest
 
@@ -149,21 +155,23 @@ parseManifest :: Text -> Maybe [ManifestLine]  -- TODO: better errors
 parseManifest txt = sequence (fmap parseLine filteredLines)
   where
     parseLine :: Text -> Maybe ManifestLine
-    parseLine t = do
-        let (imgtxt, pathtxt) = T.break isSpace t
-        img <- parseImage (T.trim imgTxt)
-        let path = textToPath (T.trim pathTxt)
-        return $ ManifestLine img path
+    parseLine t =
+        case T.split isSpace t of
+            (imgTxt : pathTxt : []) -> do
+                img <- parseImage (T.strip imgTxt)
+                let path = FS.textToPath FS.unixSeparator (T.strip pathTxt)
+                return $ ManifestLine img path
+            _ -> Nothing
 
     parseImage :: Text -> Maybe Image
     parseImage txt = do
         let (name, tag) = T.break (== ':') txt
         if ((not . T.null) name) && ((not . T.null) tag)
-            then Just $ Image name tag
+            then Just $ Image name (Tag tag)
             else Nothing
 
     filteredLines :: [Text]
-    filteredLines = ( filter (not . T.null . T.trim)
+    filteredLines = ( filter (not . T.null . T.strip)
                     . fmap (T.takeWhile (/= '#'))
-                    . T.unlines
+                    . T.lines
                     ) txt
