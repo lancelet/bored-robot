@@ -140,9 +140,8 @@ parseDockerfile :: Text -> Maybe Dockerfile
 parseDockerfile t =
     let
         s = T.unpack t
-        edf = Docker.parseString s
     in
-        case edf of
+        case Docker.parseString s of
             Right df ->
                 case Docker.getFroms df of
                     [Docker.TaggedImage i t] -> Just Dockerfile
