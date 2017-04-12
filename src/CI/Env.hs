@@ -13,6 +13,7 @@ import           Data.Map.Lazy               (Map)
 import qualified Data.Map.Lazy               as Map
 import qualified Data.Text                   as T
 import qualified Data.Text.Encoding          as T (decodeUtf8, encodeUtf8)
+import           Data.Maybe                  (fromMaybe)
 import           System.Environment
 
 -------------------------------------------------------------------------------
@@ -23,6 +24,9 @@ data Env a where
 
 read :: Member Env r => Text -> Eff r (Maybe Text)
 read = send . EnvRead
+
+readOrDefault :: Member Env r => Text -> Text -> Eff r Text
+readOrDefault key defaultVal = fmap (fromMaybe defaultVal) $ CI.Env.read key
 
 -------------------------------------------------------------------------------
 -- Interpreters
