@@ -5,9 +5,9 @@
 module Main where
 
 import Options.Applicative
-import DockerFu(parse, dockerTodo, runAll)
+import DockerFu(parse, dockerTodo)
 
 main :: IO ()
-main = do args <- execParser parse
-          runAll $ dockerTodo args
+main = putStrLn "Hello World" {- do args <- execParser parse
+         runAll $ dockerTodo args -}
 
