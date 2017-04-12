@@ -19,10 +19,10 @@ import           System.Environment
 -- DSL
 
 data Env a where
-    EnvRead :: String -> Env (Maybe String)
+    EnvRead :: Text -> Env (Maybe Text)
 
-read :: Member Env r => String -> Eff r (Maybe String)
-read key = send (EnvRead key)
+read :: Member Env r => Text -> Eff r (Maybe Text)
+read = send . EnvRead
 
 -------------------------------------------------------------------------------
 -- Interpreters
@@ -34,9 +34,12 @@ runEnv :: forall r a.
 runEnv = handleRelay return handle
   where
     handle :: Handler Env r a
-    handle (EnvRead key) k = lift (lookupEnv key) >>= k
+    handle (EnvRead key) k = lift (lookup key) >>= k
 
-runTestEnv :: Map String String -> Eff (Env ': r) a -> Eff r a
+    lookup :: Text -> IO (Maybe Text)
+    lookup = fmap (fmap T.pack) . lookupEnv . T.unpack
+
+runTestEnv :: Map Text Text -> Eff (Env ': r) a -> Eff r a
 runTestEnv map = handleRelay return handle
   where
     handle :: Handler Env r a
