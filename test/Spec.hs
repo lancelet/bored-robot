@@ -2,6 +2,7 @@ import qualified AppSpec
 import qualified CI.DockerSpec     as DockerSpec (test)
 import qualified CI.FilesystemSpec as FilesystemSpec (test)
 import qualified CI.ProcSpec       as ProcSpec (test)
+import qualified CI.EnvSpec        as EnvSpec  (test)
 
 import Test.Tasty
 
@@ -14,4 +15,5 @@ tests = testGroup "Tests"
     , AppSpec.test
     , FilesystemSpec.test
     , DockerSpec.test
+    , EnvSpec.test
     ]
