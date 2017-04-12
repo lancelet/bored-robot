@@ -15,6 +15,7 @@ import           Control.Monad.Eff.Exception
 import           Control.Monad.Eff.Trace
 import qualified Data.ByteString             as BS
 import           Data.Char                   (isSpace)
+import           Data.Maybe
 import           Data.Monoid
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
