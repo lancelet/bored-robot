@@ -147,7 +147,7 @@ parseDockerfile t =
                 case Docker.getFroms df of
                     [Docker.TaggedImage i t] -> Just Dockerfile
                         { dfFrom = Image (T.pack i) (Tag . T.pack $ t)
-                        , dfLines = length df - 1
+                        , dfLines = length df
                         }
                     _ -> Nothing
             Left _ -> Nothing
