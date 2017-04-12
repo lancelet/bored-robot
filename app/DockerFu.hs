@@ -12,6 +12,7 @@ module DockerFu where
 import           Options.Applicative
 import           Data.Monoid
 
+import           Data.Maybe (mapMaybe)
 import           Data.Text(Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -135,3 +136,29 @@ forManifest Args{..} = do tasks   <- worklist argManifest
                            CmdPull -> doPull tasks -- TODO
                            other   -> forM (job other) tasks -- TODO 
                           
+
+-------------------------------------------------------------------------------
+-- * Parsing manifest
+
+data ManifestLine = ManifestLine
+    { mfImage :: Image
+    , mfPath  :: Path }
+    
+-- TODO: better parsing
+parseManifest :: Text -> Maybe [ManifestLine]  -- TODO: better errors
+parseManifest txt = sequence (fmap parseLine lines)
+  where
+    parseLine :: Text -> Maybe ManifestLine
+    parseLine t = undefined
+
+    spaceDelimPairs :: Text -> (Text, Text)
+    spaceDelimPairs = T.span isSpace
+
+    isNonEmptyLine :: Text -> Bool
+    isNonEmptyLine = not . T.null . T.trim
+
+    trimCommentFromLine :: Text -> Text
+    trimCommentFromLine = T.takeWhile (/= '#')
+    
+    filteredLines :: [Text]
+    filteredLines = filter isNonEmptyLine $ T.unlines
