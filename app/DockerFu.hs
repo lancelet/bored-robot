@@ -146,19 +146,24 @@ data ManifestLine = ManifestLine
     
 -- TODO: better parsing
 parseManifest :: Text -> Maybe [ManifestLine]  -- TODO: better errors
-parseManifest txt = sequence (fmap parseLine lines)
+parseManifest txt = sequence (fmap parseLine filteredLines)
   where
     parseLine :: Text -> Maybe ManifestLine
-    parseLine t = undefined
+    parseLine t = do
+        let (imgtxt, pathtxt) = T.break isSpace t
+        img <- parseImage (T.trim imgTxt)
+        let path = textToPath (T.trim pathTxt)
+        return $ ManifestLine img path
 
-    spaceDelimPairs :: Text -> (Text, Text)
-    spaceDelimPairs = T.span isSpace
+    parseImage :: Text -> Maybe Image
+    parseImage txt = do
+        let (name, tag) = T.break (== ':') txt
+        if ((not . T.null) name) && ((not . T.null) tag)
+            then Just $ Image name tag
+            else Nothing
 
-    isNonEmptyLine :: Text -> Bool
-    isNonEmptyLine = not . T.null . T.trim
-
-    trimCommentFromLine :: Text -> Text
-    trimCommentFromLine = T.takeWhile (/= '#')
-    
     filteredLines :: [Text]
-    filteredLines = filter isNonEmptyLine $ T.unlines
+    filteredLines = ( filter (not . T.null . T.trim)
+                    . fmap (T.takeWhile (/= '#'))
+                    . T.unlines
+                    ) txt
