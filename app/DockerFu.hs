@@ -13,6 +13,7 @@ module DockerFu where
 import           CI.Docker
 import qualified CI.Docker.Parse as Docker
 import           CI.Git
+import           CI.Proc(Proc)
 import           CI.Filesystem (Path, Filesystem)
 import qualified CI.Filesystem as FS
 
@@ -156,32 +157,25 @@ doPush :: (Member Docker r)
 doPush Args{..} = mapM_ (pushImage . prefixWith argRegistry . taskImage)
   where prefixWith prefix img = img {imageName = prefix <> "/" <> imageName img}
 
-{-
--------------------- separator
--------------------- separator
--------------------- separator
--------------------- separator
--------------------- separator
--------------------- separator
--------------------- separator
--------------------- separator
-
-                             
--- | prepares the worklist from the manifest in the given path
-worklist :: (Member Filesystem r)
-            => FilePath -> Eff r [Task]
-worklist manifest = undefined -- TODO
 
 -- the workhorse function: iterate over all lines in the manifest
-forManifest :: (Member Filesystem r)
-               => Args -> Eff r ()
-forManifest Args{..} = do tasks   <- worklist argManifest
-                          case argCommand of
-                           CmdPull -> doPull tasks -- TODO
-                           other   -> forM (job other) tasks -- TODO 
-                          
+-- forManifest :: (Member Filesystem r)
+--                => Args -> Eff r ()
+forManifest args@Args{..} = do tasks   <- readTasks (FS.filePathToPath argManifest)
+                               (selectCommand argCommand) args tasks
 
--}
+selectCommand :: (Member Docker r
+                 , Member Git r
+                 , Member Trace r
+                 , Member Filesystem r
+                 , Member Proc r)
+                 => Command -> Args -> [Task] -> Eff r ()
+selectCommand CmdPull = doPull
+selectCommand CmdPush = doPush
+selectCommand CmdInfo = doInfo
+selectCommand other   =
+  \args tasks -> do trace (show args)
+                    error (show other ++ ": command not implemented")
 
 -------------------------------------------------------------------------------
 -- * Read manifest and extract Dockerfile information
