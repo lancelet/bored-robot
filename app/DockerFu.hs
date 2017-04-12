@@ -27,7 +27,7 @@ import qualified Debug.Trace as DT
 import           Control.Monad.Eff
 import           Control.Monad.Eff.Lift
 import           Control.Monad.Eff.Exception
-import           Control.Monad.Eff.Trace
+import           CI.Trace
 import           Control.Monad (forM)
 import           Text.Printf
 

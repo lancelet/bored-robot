@@ -12,7 +12,7 @@ import           Control.Applicative
 import           Control.Monad               (when)
 import           Control.Monad.Eff
 import           Control.Monad.Eff.Exception
-import           Control.Monad.Eff.Trace
+import           CI.Trace
 import qualified Data.ByteString             as BS
 import           Data.Char                   (isSpace)
 import           Data.Maybe
