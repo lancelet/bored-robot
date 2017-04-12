@@ -1,4 +1,16 @@
-module CI.Docker.Parse where
+module CI.Docker.Parse
+    ( getFroms
+    , getFrom
+    , Language.Dockerfile.parseString
+    , Language.Dockerfile.parseFile
+    , Language.Dockerfile.prettyPrint
+    , Language.Dockerfile.prettyPrintInstructionPos
+    , Language.Dockerfile.Dockerfile
+    , Language.Dockerfile.InstructionPos(..)
+    , Language.Dockerfile.Instruction(..)
+    , Language.Dockerfile.BaseImage(..)
+    , Language.Dockerfile.Tag
+    ) where
 
 import Data.Maybe
 import Language.Dockerfile
