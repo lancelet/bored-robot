@@ -57,7 +57,7 @@ data DockerEx
 -- | Docker effects.
 data Docker x where
     RemoveImage :: Image -> [Image] -> Docker ()
-    BuildImage  :: Path -> Tag -> Docker Image
+    BuildImage  :: Path -> Image -> Docker Image
     TagImage    :: Image -> Tag -> Docker Image
     PushImage   :: Image -> Docker ()
     PullImage   :: Image -> Docker ()
@@ -89,10 +89,10 @@ removeImages (i:is) = send (RemoveImage i is)
 buildImage
     :: Member Docker r
     => Path
-    -> Tag
+    -> Image
     -> Eff r Image
-buildImage path tag = do
-    img <- send (BuildImage path tag)
+buildImage path image = do
+    img <- send (BuildImage path image)
     return img
 
 -- | Apply a 'Tag' to a Docker 'Image'.
@@ -119,7 +119,7 @@ runDocker = handleRelay return handle
   where
     handle :: Handler Docker r a
     handle (RemoveImage img imgs) k = procRemoveImage (img:imgs) >>= k
-    handle (BuildImage path tag)  k = procBuildImage path tag >>= k
+    handle (BuildImage path img)  k = procBuildImage path img >>= k
     handle (TagImage img tag)     k = procTagImage img tag >>= k
     handle (PushImage img)        k = procPushImage img >>= k
     handle (PullImage img)        k = procPullImage img >>= k
@@ -151,13 +151,13 @@ procBuildImage
     :: ( Member Proc r
       , Member (Exception DockerEx) r)
     => Path -- ^ Directory containing the @Dockerfile@
-    -> Tag
+    -> Image
     -> Eff r Image
-procBuildImage path tag = do
-    (status, stdout, stderr) <- docker "build" [path]
+procBuildImage path img = do
+    (status, stdout, stderr) <- docker "build" ["--tag", imageRepr img, path]
     when (isFailure status) $ throwException (parseError stderr)
     -- TODO Parse correct output
-    return (Image "yay!" tag)
+    return img
 
 -- | Tag a Docker 'Image' with a 'Tag'.
 --
@@ -219,7 +219,7 @@ runDockerTrace = handleRelay return handle
   where
     handle :: Handler Docker r a
     handle (RemoveImage img imgs) k = traceRemoveImage (img:imgs) >>= k
-    handle (BuildImage path tag)  k = traceBuildImage path tag >>= k
+    handle (BuildImage path img)  k = traceBuildImage path img >>= k
     handle (TagImage img tag)     k = traceTagImage img tag >>= k
     handle (PushImage img)        k = tracePushImage img >>= k
     handle (PullImage img)        k = tracePullImage img >>= k
@@ -233,8 +233,10 @@ traceRemoveImage is = trace $ "docker rmi " <> unwords (T.unpack . imageRepr <$>
 
 traceBuildImage
     :: (Member Trace r, Member (Exception DockerEx) r)
-    => Path -> Tag -> Eff r Image
-traceBuildImage path tag = throwException (DockerError "traceBuildImage unimplemented")
+    => Path -> Image -> Eff r Image
+traceBuildImage path img = do
+    trace . T.unpack $ "docker build --tag " <> imageRepr img <> " " <> path
+    return img
 
 traceTagImage
     :: (Member Trace r, Member (Exception DockerEx) r)

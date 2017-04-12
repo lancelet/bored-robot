@@ -77,8 +77,8 @@ tagMissingImageTest = testCase "tag a [missing] image" testAction
     target = Image "ahahahahahah" (Tag "what")
 
     tagAnImage :: ( Member Proc r
-                    , Member Docker r
-                    , Member (Exception DockerEx) r )
-                    => Eff r Image
+                 , Member Docker r
+                 , Member (Exception DockerEx) r )
+                 => Eff r Image
     tagAnImage = tagImage target (Tag "excrescence")
 
