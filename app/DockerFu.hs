@@ -159,8 +159,14 @@ doPush Args{..} = mapM_ (pushImage . prefixWith argRegistry . taskImage)
 
 
 -- the workhorse function: iterate over all lines in the manifest
--- forManifest :: (Member Filesystem r)
---                => Args -> Eff r ()
+forManifest :: ( Member Docker r
+               , Member Git r
+               , Member Trace r
+               , Member Filesystem r
+               , Member Proc r
+               , Member (Exception DockerFuException) r
+               )
+               => Args -> Eff r ()
 forManifest args@Args{..} = do tasks   <- readTasks (FS.filePathToPath argManifest)
                                (selectCommand argCommand) args tasks
 
