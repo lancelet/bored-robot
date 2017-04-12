@@ -9,6 +9,7 @@ import Control.Monad.Eff.Trace
 import Control.Monad.Eff.Exception
 import Control.Monad.Eff.Lift
 import qualified Data.Text as T
+import qualified Data.Text.IO as T
 import System.Environment
 import Data.String
 
@@ -19,13 +20,20 @@ import CI.Git
 import CI.Docker
 import CI.Filesystem
 
+optionalTag :: [String] -> Maybe Tag
+optionalTag [tag] = Just . Tag $ T.pack tag
+optionalTag _ = Nothing
+
 main :: IO ()
 main = do
-    [path, name, tag] <- getArgs
-    let path' = fromString path
-    r <- runStack $ doiit path' (Image (T.pack name) (Tag $ T.pack tag)) Nothing
+    (ps:ns:ts:rest) <- getArgs
+    let path = fromString ps
+    let name = T.pack ns
+    let tag = Tag (T.pack ts)
+    let tag2 = optionalTag rest
+    r <- runStack $ doiit path (Image name tag) tag2
     case r of
-        Right (Right (Right (Right img))) -> print img
+        Right (Right (Right (Right img))) -> T.putStrLn $ "Created image: " <> imageRepr img
         err -> print err
 
 runStack
@@ -36,7 +44,6 @@ runStack
 runStack =
     runLift . runTrace . runException . runException . runException . runException .
     runFilesystem . runProc . runGit . runDocker . runProgName . runCurrentTime
-
 
 doiit :: ( Member Docker r
         , Member (Exception DockerEx) r
@@ -51,11 +58,13 @@ doiit :: ( Member Docker r
         )
         => Path -> Image -> Maybe Tag -> Eff r Image
 doiit path target tag = do
+    trace $ "🐩💩  " <> "Iä! Iä! Cthulhu fhtagn!"
     prog <- progName
     ts <- printCurrentTime ymDHMS
-    trace $ "Executing " <> T.unpack prog <> " as at " <> ts
+    let curr = Tag (T.pack ts)
+    trace $ "🐩💩  " <> "Executing " <> T.unpack prog <> " as at " <> ts
     img <- buildImage path target
     img' <- case tag of
-        Just t -> tagImage img t
-        Nothing -> pure img
+        Just t -> trace "Applying tag" >> tagImage img t
+        Nothing -> trace "Tagging with current time" >> tagImage img curr
     return img'
