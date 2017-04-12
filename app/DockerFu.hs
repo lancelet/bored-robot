@@ -89,3 +89,49 @@ runAll = runLift . runTrace
          -- runException . runFs
 
 
+--------------------------------------------------
+-- types coming from Docker and FS
+-- 
+
+data Task = Task { taskTag :: Image
+                 , taskDir :: Path
+                 , taskDockerfile :: Dockerfile
+                 }
+
+data Dockerfile = Dockerfile { dfFrom  :: Image
+                             , dfLines :: Int
+                             }
+
+-------------------- separator
+-------------------- separator
+-------------------- separator
+-------------------- separator
+-------------------- separator
+-------------------- separator
+-------------------- separator
+-------------------- separator
+
+-- | prepares the worklist from the manifest in the given path
+worklist :: (Member Filesystem r)
+            => FilePath -> Eff r [Task]
+worklist manifest = undefined -- TODO
+
+-------------------- separator
+-------------------- separator
+-------------------- separator
+-------------------- separator
+-------------------- separator
+-------------------- separator
+-------------------- separator
+-------------------- separator
+
+                    
+
+-- the workhorse function: iterate over all lines in the manifest
+forManifest :: (Member Filesystem r)
+               => Args -> Eff r ()
+forManifest Args{..} = do tasks   <- worklist argManifest
+                          case argCommand of
+                           CmdPull -> doPull tasks -- TODO
+                           other   -> forM (job other) tasks -- TODO 
+                          
