@@ -11,7 +11,7 @@ import Test.Tasty.HUnit
 import           Control.Monad.Eff
 import           Control.Monad.Eff.Exception
 import           Control.Monad.Eff.Lift
-import           Control.Monad.Eff.Trace
+import           CI.Trace
 import qualified Data.ByteString             as BS
 import           Data.Monoid
 import           Data.Text                   (Text)

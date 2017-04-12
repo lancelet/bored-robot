@@ -46,7 +46,7 @@ readTest = testCase "read test (IO)" testAction
     testAction = do
         r <- action
         case r of
-            Left _ -> assertFailure "Could not read file"
+            Left _   -> assertFailure "Could not read file"
             Right bs -> assertBool "Contents should contain \"bored-robot\"" $
                 T.isInfixOf "bored-robot" (T.decodeUtf8 bs)
 

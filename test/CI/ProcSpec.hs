@@ -31,13 +31,13 @@ stackVersionTest = testCase "invoke proc to get stack version" testAction
     testAction = do
         r <- action
         case r of
-            Left _ -> assertFailure "Expected: \"Version\"..."
+            Left _    -> assertFailure "Expected: \"Version\"..."
             Right str -> assertBool "Expected: \"Version\"..."
                          $ T.isPrefixOf "Version" str
         return ()
 
     action :: IO (Either ProcEx Text)
-    action = runLift $ runException $ runProc $ getStackVersion
+    action = runLift . runException . runProc $ getStackVersion
 
     getStackVersion :: ( Member Proc r,
                          Member (Exception ProcEx) r )
