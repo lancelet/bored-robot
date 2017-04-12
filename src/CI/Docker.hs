@@ -24,11 +24,10 @@ import qualified Data.Text.Encoding          as T
 import           System.Exit                 (ExitCode (ExitFailure, ExitSuccess))
 import qualified System.Process.ListLike     as SP
 
-import CI.Proc as Proc
+import CI.Filesystem as FS
+import CI.Proc       as Proc
 
 -- * Types
-
-type Path = Text
 
 -- | A Docker image tag.
 newtype Tag = Tag { tagRepr :: Text }
@@ -154,7 +153,7 @@ procBuildImage
     -> Image
     -> Eff r Image
 procBuildImage path img = do
-    (status, stdout, stderr) <- docker "build" ["--tag", imageRepr img, path]
+    (status, stdout, stderr) <- docker "build" ["--tag", imageRepr img, pathToText unixSeparator path]
     when (isFailure status) $ throwException (parseError stderr)
     -- TODO Parse correct output
     return img
@@ -235,7 +234,7 @@ traceBuildImage
     :: (Member Trace r, Member (Exception DockerEx) r)
     => Path -> Image -> Eff r Image
 traceBuildImage path img = do
-    trace . T.unpack $ "docker build --tag " <> imageRepr img <> " " <> path
+    trace . T.unpack $ "docker build --tag " <> imageRepr img <> " " <> (pathToText unixSeparator path)
     return img
 
 traceTagImage
