@@ -150,7 +150,10 @@ mkInfoText Task{..} =
                , T.pack $ replicate 40 '-', T.empty
                ]
              
-
+doPush :: (Member Docker r)
+          => Args -> [Task] -> Eff r ()
+doPush Args{..} = mapM_ (pushImage . prefixWith argRegistry . taskImage)
+  where prefixWith prefix img = img {imageName = prefix <> "/" <> imageName img}
 
 {-
 -------------------- separator
