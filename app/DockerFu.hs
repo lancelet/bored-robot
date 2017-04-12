@@ -11,6 +11,7 @@
 module DockerFu where
 
 import CI.Docker
+import CI.Git
 import           CI.Filesystem (Path, Filesystem)
 import qualified CI.Filesystem as FS
 
@@ -115,7 +116,7 @@ data Dockerfile = Dockerfile { dfFrom  :: Image
 -- | pull all base images (FROM in Dockerfiles) that are not mentioned in the
 -- manifest. Note that base images will have a registry prefix while the
 -- manifest image names do not.
-doPull :: (Member Docker r, Member Trace r)
+doPull :: (Member Docker r, Member Trace r) -- TODO docker exception things
           => Args -> [Task] -> Eff r ()
 doPull Args{..} ts = mapM_ pullOrReport ts
   where inTargets :: Image -> Bool
@@ -129,6 +130,27 @@ doPull Args{..} ts = mapM_ pullOrReport ts
                                         pullImage baseImage
           where baseImage = dfFrom taskDockerfile
                 baseStr   = T.unpack (imageRepr baseImage)
+
+doInfo :: (Member Trace r, Member Git r)
+          => Args -> [Task] -> Eff r ()
+doInfo Args{..} ts = do trace $ "Using Registry: " ++ T.unpack argRegistry
+                        infos <- mapM mkInfoText ts
+                        mapM_ (trace . T.unpack) infos
+
+mkInfoText :: (Member Git r) => Task -> Eff r Text
+mkInfoText Task{..} =
+          do hash <- gitHeadShortCommit
+             -- TODO this is wrong, needs to descend into the subdirectory
+             pure $ T.concat $
+               [ "Docker image"  <> imageRepr taskImage
+               , "\t(as per commit " <> hash <>")"
+               , "Source:\t"     <> FS.pathToText FS.unixSeparator taskDir
+               , "Based on:\t"   <> imageRepr (dfFrom taskDockerfile)
+               , "Dockerfile:\t" <> T.pack (show (dfLines taskDockerfile)) <> " lines"
+               , T.pack $ replicate 40 '-', T.empty
+               ]
+             
+
 
 {-
 -------------------- separator
