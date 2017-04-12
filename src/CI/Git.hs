@@ -11,23 +11,19 @@ module CI.Git where
 
 import CI.Proc
 
-import           Control.Applicative         (empty)
-import           Control.Exception           (SomeException(..))
+import           Control.Exception           (SomeException (..))
 import qualified Control.Exception           as GHC
 import           Control.Monad.Eff
 import           Control.Monad.Eff.Exception
 import           Control.Monad.Eff.Lift
-import           Control.Monad.IO.Class      (MonadIO, liftIO)
 import           Crypto.Hash                 (Digest, SHA1,
                                               digestFromByteString, hash)
-import qualified Data.ByteString             as BS
 import           Data.ByteString             (ByteString)
+import qualified Data.ByteString             as BS
 import qualified Data.ByteString.Base16      as BS16 (decode)
-import           Data.Maybe                  (fromJust)
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import qualified Data.Text.Encoding          as T (decodeUtf8, encodeUtf8)
-import           Debug.Trace                 (trace, traceM)
 
 newtype BranchName = BranchName { unBranchName :: Text } deriving (Eq, Show)
 
