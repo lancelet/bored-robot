@@ -13,6 +13,7 @@ import qualified Data.Text.IO as T
 import System.Environment
 import Data.String
 
+import CI
 import CI.Proc
 import CI.ProgName
 import CI.CurrentTime
@@ -35,15 +36,6 @@ main = do
     case r of
         Right (Right (Right (Right img))) -> T.putStrLn $ "Created image: " <> imageRepr img
         err -> print err
-
-runStack
-    :: Eff '[ CurrentTime, ProgName, Docker, Git, Proc, Filesystem,
-             Exception FilesystemEx, Exception ProcEx, Exception DockerEx,
-             Exception GitEx, Trace, Lift IO] a
-    -> IO (Either GitEx (Either DockerEx (Either ProcEx (Either FilesystemEx a))))
-runStack =
-    runLift . runTrace . runException . runException . runException . runException .
-    runFilesystem . runProc . runGit . runDocker . runProgName . runCurrentTime
 
 doiit :: ( Member Docker r
         , Member (Exception DockerEx) r
