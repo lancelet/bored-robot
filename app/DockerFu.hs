@@ -10,7 +10,7 @@
 module DockerFu where
 
 import CI.Docker
-import           CI.Filesystem (Path)
+import           CI.Filesystem (Path, Filesystem)
 import qualified CI.Filesystem as FS
 
 import           Options.Applicative
@@ -19,6 +19,7 @@ import           Data.Monoid
 import           Data.Maybe (mapMaybe)
 import           Data.Text(Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
 import qualified Debug.Trace as DT
 
@@ -26,6 +27,7 @@ import           Control.Monad.Eff
 import           Control.Monad.Eff.Lift
 import           Control.Monad.Eff.Exception
 import           Control.Monad.Eff.Trace
+import           Control.Monad (forM)
 import           Text.Printf
 
 -- | program options (environment in the bash script)
@@ -94,6 +96,7 @@ runAll = runLift . runTrace
          -- runExeception . runGit .
          -- runException . runDocker .
          -- runException . runFs
+-}
 
 
 --------------------------------------------------
@@ -104,35 +107,15 @@ data Task = Task { taskTag :: Image
                  , taskDir :: Path
                  , taskDockerfile :: Dockerfile
                  }
-
 data Dockerfile = Dockerfile { dfFrom  :: Image
-                             , dfLines :: Int
-                             }
+                             , dfLines :: Int }
 
--------------------- separator
--------------------- separator
--------------------- separator
--------------------- separator
--------------------- separator
--------------------- separator
--------------------- separator
--------------------- separator
-
+{-
+                             
 -- | prepares the worklist from the manifest in the given path
 worklist :: (Member Filesystem r)
             => FilePath -> Eff r [Task]
 worklist manifest = undefined -- TODO
-
--------------------- separator
--------------------- separator
--------------------- separator
--------------------- separator
--------------------- separator
--------------------- separator
--------------------- separator
--------------------- separator
-
-                    
 
 -- the workhorse function: iterate over all lines in the manifest
 forManifest :: (Member Filesystem r)
@@ -144,6 +127,40 @@ forManifest Args{..} = do tasks   <- worklist argManifest
                           
 
 -}
+
+-------------------------------------------------------------------------------
+-- * Read manifest and extract Dockerfile information
+
+data DockerFuException
+    = DockerFuFailed
+    deriving (Eq, Show)
+
+parseDockerfile :: Text -> Maybe Dockerfile
+parseDockerfile = error "parseDockerfile not implemented - see Luke"
+
+readAndParseDockerfile :: ( Member Filesystem r
+                          , Member (Exception DockerFuException) r )
+                       => Path
+                       -> Eff r Dockerfile
+readAndParseDockerfile path = do
+    fileContents <- T.decodeUtf8 <$> FS.read path
+    case parseDockerfile fileContents of
+        Just df -> return df
+        Nothing -> throwException DockerFuFailed -- TODO
+
+readTasks :: ( Member Filesystem r
+             , Member (Exception DockerFuException) r )
+          => Path
+          -> Eff r [Task]
+readTasks path = do
+    manifestFile <- T.decodeUtf8 <$> FS.read path
+    -- TODO: handle errors
+    case parseManifest manifestFile of
+        Nothing -> return []
+        Just mfLines -> forM mfLines $ \mfLine -> do
+            df <- readAndParseDockerfile (mfPath mfLine)
+            return $ Task (mfImage mfLine) (mfPath mfLine) df
+    
 -------------------------------------------------------------------------------
 -- * Parsing manifest
 
