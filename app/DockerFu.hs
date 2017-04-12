@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE RecordWildCards       #-}
 
 module DockerFu where
 
@@ -103,14 +104,42 @@ runAll = runLift . runTrace
 -- types coming from Docker and FS
 -- 
 
-data Task = Task { taskTag :: Image
-                 , taskDir :: Path
+data Task = Task { taskImage :: Image
+                 , taskDir   :: Path
                  , taskDockerfile :: Dockerfile
                  }
 data Dockerfile = Dockerfile { dfFrom  :: Image
-                             , dfLines :: Int }
+                             , dfLines :: Int
+                             }
+
+-- | pull all base images (FROM in Dockerfiles) that are not mentioned in the
+-- manifest. Note that base images will have a registry prefix while the
+-- manifest image names do not.
+doPull :: (Member Docker r, Member Trace r)
+          => Args -> [Task] -> Eff r ()
+doPull Args{..} ts = mapM_ pullOrReport ts
+  where inTargets :: Image -> Bool
+        inTargets img = dropRegistry img `elem` targets
+        targets = map taskImage ts
+        dropRegistry img@Image{..} = maybe img (\n -> img{ imageName = n})
+                                     $ T.stripPrefix argRegistry imageName
+        pullOrReport Task{..} = if inTargets baseImage
+                                then trace (baseStr ++ " found in manifest, skipping")
+                                else do trace ("pulling " ++ baseStr)
+                                        pullImage baseImage
+          where baseImage = dfFrom taskDockerfile
+                baseStr   = T.unpack (imageRepr baseImage)
 
 {-
+-------------------- separator
+-------------------- separator
+-------------------- separator
+-------------------- separator
+-------------------- separator
+-------------------- separator
+-------------------- separator
+-------------------- separator
+
                              
 -- | prepares the worklist from the manifest in the given path
 worklist :: (Member Filesystem r)
