@@ -47,6 +47,7 @@ instance Show Image where
 -- | Exceptions which may be raised by Docker effects.
 data DockerEx
     = DockerError { errorMessage :: Text } -- ^ Unknown error from Docker.
+    | MissingRecipe { missingPath :: Path } -- ^ Path does not exist.
     | MissingArguments { errorMessage :: Text } -- ^ Report missing mandatory arguments.
     | NoSuchImage { missingImage :: Image } -- ^ An operation failed because an image was missing.
     deriving (Show)
@@ -108,6 +109,8 @@ pullImage img = send (PullImage img)
 runDocker
     :: forall r a.
       ( Member (Exception DockerEx) r
+      , Member Filesystem r
+      , Member (Exception FilesystemEx) r
       , Member Proc r)
     => Eff (Docker ': r) a
     -> Eff r a
@@ -145,13 +148,18 @@ procPullImage img = do
 -- | Build a Docker 'Image' using the @Dockerfile@ in a directory.
 procBuildImage
     :: ( Member Proc r
+      , Member Filesystem r
       , Member (Exception DockerEx) r)
     => Path -- ^ Directory containing the @Dockerfile@
     -> Image
     -> Eff r Image
 procBuildImage path img = do
+    exists <- doesDirectoryExist path
+    when (not exists) $
+        throwException (MissingRecipe path)
     (status, _stdout, stderr) <- docker "build" ["--tag", imageRepr img, pathToText unixSeparator path]
-    when (isFailure status) $ throwException (parseError stderr)
+    when (isFailure status) $
+        throwException (parseError stderr)
     -- TODO Parse correct output
     return img
 
