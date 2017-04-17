@@ -25,7 +25,7 @@ read :: Member Env r => Text -> Eff r (Maybe Text)
 read = send . EnvRead
 
 readOrDefault :: Member Env r => Text -> Text -> Eff r Text
-readOrDefault key defaultVal = fmap (fromMaybe defaultVal) $ CI.Env.read key
+readOrDefault key defaultVal = fromMaybe defaultVal <$> CI.Env.read key
 
 -------------------------------------------------------------------------------
 -- Interpreters

@@ -253,11 +253,11 @@ traceTagImage img@(Image name _tag) tag' = do
 tracePushImage
     :: (Member Trace r, Member (Exception DockerEx) r)
     => Image -> Eff r ()
-tracePushImage img = do
+tracePushImage img =
     trace $ "docker push " <> T.unpack (imageRepr img)
 
 tracePullImage
     :: (Member Trace r, Member (Exception DockerEx) r)
     => Image -> Eff r ()
-tracePullImage img = do
+tracePullImage img =
     trace $ "docker pull " <> T.unpack (imageRepr img)

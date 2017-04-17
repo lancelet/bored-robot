@@ -37,7 +37,7 @@ stackVersionTest = testCase "invoke proc to get stack version" testAction
         return ()
 
     action :: IO (Either ProcEx Text)
-    action = runLift $ runException $ runProc $ getStackVersion
+    action = runLift $ runException $ runProc getStackVersion
 
     getStackVersion :: ( Member Proc r,
                          Member (Exception ProcEx) r )
