@@ -8,7 +8,6 @@ module CI.CurrentTime where
 import Control.Monad.Eff
 import Control.Monad.Eff.Lift
 import Data.Time
-import Data.Time.Format
 
 data CurrentTime x where
   CurrentTime :: CurrentTime LocalTime

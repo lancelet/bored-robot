@@ -9,8 +9,7 @@
 module CI.Filesystem where
 
 import qualified Control.Exception           as CE
-import           Control.Monad.Catch         (MonadCatch, MonadMask, MonadThrow,
-                                              catch, throwM, try)
+import           Control.Monad.Catch         (try)
 import           Control.Monad.Eff
 import           Control.Monad.Eff.Exception
 import           Control.Monad.Eff.Lift

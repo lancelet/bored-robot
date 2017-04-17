@@ -15,9 +15,7 @@ import Test.QuickCheck(elements, Arbitrary(..))
 import Data.Maybe(fromMaybe, maybe)
 import Data.Char(toLower)
 
-import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
 
 import Options.Applicative.Extra(getParseResult, execParserPure)
 import Options.Applicative(defaultPrefs)
@@ -37,10 +35,10 @@ defaultArgs = Args { argRegistry = "omnia.docker.dev.cba"
                    , argCommand  = CmdInfo
                    }
 
-optionParsing = testProperty "option parsing" testRandomArgs 
+optionParsing = testProperty "option parsing" testRandomArgs
 
 testRandomArgs :: Maybe String -> Maybe FilePath -> Command -> Bool
-testRandomArgs registry manifest cmd = Just expected == parseHelp args 
+testRandomArgs registry manifest cmd = Just expected == parseHelp args
   where maybeReg = maybe [] (\r -> ["--registry", r]) registry
         maybeMan = maybe [] (\m -> ["--manifest", m]) manifest
         args     = concat [maybeReg, maybeMan, [asString cmd]]
@@ -50,7 +48,7 @@ testRandomArgs registry manifest cmd = Just expected == parseHelp args
                         }
 
 asString :: Command -> String
-asString = map toLower . drop 3 . show 
+asString = map toLower . drop 3 . show
 
 instance Arbitrary Command where
   arbitrary = elements [CmdPull, CmdBuild, CmdPush, CmdClean, CmdInfo]
@@ -59,4 +57,3 @@ instance Arbitrary Command where
 
 parseHelp :: [String] -> Maybe DockerFu.Args
 parseHelp = getParseResult . execParserPure defaultPrefs parse
-

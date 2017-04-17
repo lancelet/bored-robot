@@ -20,7 +20,7 @@ import qualified Data.Vector as V
 
 import Test.Tasty
 import Test.Tasty.HUnit
-    
+
 test :: TestTree
 test = testGroup "FilesystemSpec Tests"
     [ readTest
@@ -149,7 +149,7 @@ doesFileExistTest = testCase "doesFileExist test (IO)" testAction
 
     actionFalse :: IO (Either FS.FilesystemEx Bool)
     actionFalse = (runFS . FS.doesFileExist) (FS.filePathToPath "fake-file.blh")
-    
+
 
 createRemoveDirectoryTest :: TestTree
 createRemoveDirectoryTest = testCase

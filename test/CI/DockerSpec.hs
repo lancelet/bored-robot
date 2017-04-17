@@ -10,13 +10,8 @@ import Test.Tasty.HUnit
 
 import           Control.Monad.Eff
 import           Control.Monad.Eff.Exception
-import           Control.Monad.Eff.Lift
 import           Control.Monad.Eff.Trace
-import qualified Data.ByteString             as BS
 import           Data.Monoid
-import           Data.Text                   (Text)
-import qualified Data.Text                   as T
-import qualified Data.Text.Encoding          as T
 
 import CI.Docker
 import CI.Filesystem
@@ -39,7 +34,7 @@ buildAndTag = testCase "build and tag" testAction
     testAction :: IO ()
     testAction = do
         case action of
-            (Right img, tr) -> assertBool ("Expected to get " <> show target <> " but got " <> show img) (target == img)
+            (Right img, _) -> assertBool ("Expected to get " <> show target <> " but got " <> show img) (target == img)
             (Left err, tr) -> assertFailure $ "Failed to execute commands: " <> show err <> unlines tr
         return ()
 
@@ -48,7 +43,7 @@ buildAndTag = testCase "build and tag" testAction
 
     source = Image "ahahahahahah" (Tag "latest")
 
-    target = Image "ahahahahahah" (tag)
+    target = Image "ahahahahahah" tag
 
     tag = Tag "excrescence"
 
@@ -58,6 +53,4 @@ buildAndTag = testCase "build and tag" testAction
             => Eff r Image
     doiit = do
         img <- buildImage (filePathToPath "hello/my/friend") source
-        img' <- tagImage img tag
-        return img'
-
+        tagImage img tag

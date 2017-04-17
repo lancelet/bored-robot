@@ -15,7 +15,7 @@ import           Control.Monad.Eff.Lift
 import           Data.ByteString             (ByteString)
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
-import           System.Exit                 (ExitCode (ExitFailure, ExitSuccess))
+import           System.Exit                 (ExitCode (ExitSuccess))
 import           System.Process.ListLike     (CreateProcess,
                                               readCreateProcessWithExitCode)
 import qualified System.Process.ListLike     as SP (proc)

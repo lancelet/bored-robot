@@ -13,12 +13,7 @@ import           Test.Tasty
 import           Test.Tasty.HUnit
 import           Control.Monad.Eff
 import           Control.Monad.Eff.Lift
-import           Data.Text              (Text)
-import qualified Data.Text              as T
-import qualified Data.Text.Encoding     as T
-import qualified Data.ByteString        as BS
 import           System.Environment
-import           Data.Map.Lazy          (Map)
 import qualified Data.Map.Lazy          as Map
 
 test :: TestTree

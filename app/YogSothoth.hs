@@ -56,7 +56,6 @@ doiit path target tag = do
     let curr = Tag (T.pack ts)
     trace $ "🐩💩  " <> "Executing " <> T.unpack prog <> " as at " <> ts
     img <- buildImage path target
-    img' <- case tag of
+    case tag of
         Just t -> trace "Applying tag" >> tagImage img t
         Nothing -> trace "Tagging with current time" >> tagImage img curr
-    return img'
