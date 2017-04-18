@@ -6,11 +6,14 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE RecordWildCards       #-}
 
 module DockerFu where
 
-import CI.Docker
+import           CI.Docker
 import qualified CI.Docker.Parse as Docker
+import           CI.Git
+import           CI.Proc(Proc)
 import           CI.Filesystem (Path, Filesystem)
 import qualified CI.Filesystem as FS
 
@@ -104,30 +107,81 @@ runAll = runLift . runTrace
 -- types coming from Docker and FS
 -- 
 
-data Task = Task { taskTag :: Image
-                 , taskDir :: Path
+data Task = Task { taskImage :: Image
+                 , taskDir   :: Path
                  , taskDockerfile :: Dockerfile
                  }
 data Dockerfile = Dockerfile { dfFrom  :: Image
-                             , dfLines :: Int }
+                             , dfLines :: Int
+                             }
 
-{-
-                             
--- | prepares the worklist from the manifest in the given path
-worklist :: (Member Filesystem r)
-            => FilePath -> Eff r [Task]
-worklist manifest = undefined -- TODO
+-- | pull all base images (FROM in Dockerfiles) that are not mentioned in the
+-- manifest. Note that base images will have a registry prefix while the
+-- manifest image names do not.
+doPull :: (Member Docker r, Member Trace r) -- TODO docker exception things
+          => Args -> [Task] -> Eff r ()
+doPull Args{..} ts = mapM_ pullOrReport ts
+  where inTargets :: Image -> Bool
+        inTargets img = dropRegistry img `elem` targets
+        targets = map taskImage ts
+        dropRegistry img@Image{..} = maybe img (\n -> img{ imageName = n})
+                                     $ T.stripPrefix argRegistry imageName
+        pullOrReport Task{..} = if inTargets baseImage
+                                then trace (baseStr ++ " found in manifest, skipping")
+                                else do trace ("pulling " ++ baseStr)
+                                        pullImage baseImage
+          where baseImage = dfFrom taskDockerfile
+                baseStr   = T.unpack (imageRepr baseImage)
+
+doInfo :: (Member Trace r, Member Git r)
+          => Args -> [Task] -> Eff r ()
+doInfo Args{..} ts = do trace $ "Using Registry: " ++ T.unpack argRegistry
+                        infos <- mapM mkInfoText ts
+                        mapM_ (trace . T.unpack) infos
+
+mkInfoText :: (Member Git r) => Task -> Eff r Text
+mkInfoText Task{..} =
+          do hash <- gitHeadShortCommit
+             -- TODO this is wrong, needs to descend into the subdirectory
+             pure $ T.concat $
+               [ "Docker image"  <> imageRepr taskImage
+               , "\t(as per commit " <> hash <>")"
+               , "Source:\t"     <> FS.pathToText FS.unixSeparator taskDir
+               , "Based on:\t"   <> imageRepr (dfFrom taskDockerfile)
+               , "Dockerfile:\t" <> T.pack (show (dfLines taskDockerfile)) <> " lines"
+               , T.pack $ replicate 40 '-', T.empty
+               ]
+             
+doPush :: (Member Docker r)
+          => Args -> [Task] -> Eff r ()
+doPush Args{..} = mapM_ (pushImage . prefixWith argRegistry . taskImage)
+  where prefixWith prefix img = img {imageName = prefix <> "/" <> imageName img}
+
 
 -- the workhorse function: iterate over all lines in the manifest
-forManifest :: (Member Filesystem r)
+forManifest :: ( Member Docker r
+               , Member Git r
+               , Member Trace r
+               , Member Filesystem r
+               , Member Proc r
+               , Member (Exception DockerFuException) r
+               )
                => Args -> Eff r ()
-forManifest Args{..} = do tasks   <- worklist argManifest
-                          case argCommand of
-                           CmdPull -> doPull tasks -- TODO
-                           other   -> forM (job other) tasks -- TODO 
-                          
+forManifest args@Args{..} = do tasks   <- readTasks (FS.filePathToPath argManifest)
+                               (selectCommand argCommand) args tasks
 
--}
+selectCommand :: (Member Docker r
+                 , Member Git r
+                 , Member Trace r
+                 , Member Filesystem r
+                 , Member Proc r)
+                 => Command -> Args -> [Task] -> Eff r ()
+selectCommand CmdPull = doPull
+selectCommand CmdPush = doPush
+selectCommand CmdInfo = doInfo
+selectCommand other   =
+  \args tasks -> do trace (show args)
+                    error (show other ++ ": command not implemented")
 
 -------------------------------------------------------------------------------
 -- * Read manifest and extract Dockerfile information
